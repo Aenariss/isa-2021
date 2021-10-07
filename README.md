@@ -11,18 +11,18 @@ Odevzdaný projekt musí obsahovat:
 - Soubor se zdrojovým kódem (dodržujte jména souborů uvedená v konkrétním zadání)  
 - Funkční Makefile pro překlad zdrojového souboru  
 - Dokumentaci (soubor manual.pdf), která bude obsahovat uvedení do problematiky, návrhu aplikace, popis implementace, základní informace o programu, návod na použití.  
-V dokumentaci se očekává následující: titulní strana, obsah, logické strukturování textu, přehled nastudovaných informací z literatury, popis zajímavějších pasáží implementace, použití vytvořených programů a literatura.  
-Soubor README obsahující krátký textový popis programu s případnými rozšířeními/omezeními, příklad spuštění a seznam odevzdaných souborů,
+- V dokumentaci se očekává následující: titulní strana, obsah, logické strukturování textu, přehled nastudovaných informací z literatury, popis zajímavějších pasáží implementace, použití vytvořených programů a literatura.  
+- Soubor README obsahující krátký textový popis programu s případnými rozšířeními/omezeními, příklad spuštění a seznam odevzdaných souborů,
 další požadované soubory podle konkrétního typu zadání.   
-Pokud v projektu nestihnete implementovat všechny požadované vlastnosti, je nutné veškerá omezení jasně uvést v dokumentaci a v souboru README.  
-Co není v zadání jednoznačně uvedeno, můžete implementovat podle svého vlastního výběru. Zvolené řešení popište v dokumentaci.  
-Při řešení projektu respektujte zvyklosti zavedené v OS unixového typu (jako je například formát textového souboru).  
-Vytvořené programy by měly být použitelné a smysluplné, řádně komentované a formátované a členěné do funkcí a modulů. Program by měl obsahovat nápovědu informující uživatele o činnosti programu a jeho parametrech. Případné chyby budou intuitivně popisovány uživateli.  
-Aplikace nesmí v žádném případě skončit s chybou SEGMENTATION FAULT ani jiným násilným systémovým ukončením (např. dělení nulou).  
-Pokud přejímáte krátké pasáže zdrojových kódů z různých tutoriálů či příkladů z Internetu (ne mezi sebou), tak je nutné vyznačit tyto sekce a jejich autory dle licenčních podmínek, kterými se distribuce daných zdrojových kódů řídí. V případě nedodržení bude na projekt nahlíženo jako na plagiát.  
-Konzultace k projektu podává vyučující, který zadání vypsal.  
-Sledujte fórum k projektu, kde se může objevit dovysvětlení či upřesnění zadání.  
-Před odevzdáním zkontrolujte, zda projekt obsahuje všechny potřebné soubory a také jste dodrželi jména odevzdávaných souborů pro konkrétní zadání. Zkontrolujte, zda je projekt přeložitelný.  
+- Pokud v projektu nestihnete implementovat všechny požadované vlastnosti, je nutné veškerá omezení jasně uvést v dokumentaci a v souboru README.  
+- Co není v zadání jednoznačně uvedeno, můžete implementovat podle svého vlastního výběru. Zvolené řešení popište v dokumentaci.  
+- Při řešení projektu respektujte zvyklosti zavedené v OS unixového typu (jako je například formát textového souboru).  
+- Vytvořené programy by měly být použitelné a smysluplné, řádně komentované a formátované a členěné do funkcí a modulů. Program by měl obsahovat nápovědu informující uživatele o činnosti programu a jeho parametrech. Případné chyby budou intuitivně popisovány uživateli.  
+- Aplikace nesmí v žádném případě skončit s chybou SEGMENTATION FAULT ani jiným násilným systémovým ukončením (např. dělení nulou).  
+- Pokud přejímáte krátké pasáže zdrojových kódů z různých tutoriálů či příkladů z Internetu (ne mezi sebou), tak je nutné vyznačit tyto sekce a jejich autory dle licenčních podmínek, kterými se distribuce daných zdrojových kódů řídí. V případě nedodržení bude na projekt nahlíženo jako na plagiát.  
+- Konzultace k projektu podává vyučující, který zadání vypsal.  
+- Sledujte fórum k projektu, kde se může objevit dovysvětlení či upřesnění zadání.  
+- Před odevzdáním zkontrolujte, zda projekt obsahuje všechny potřebné soubory a také jste dodrželi jména odevzdávaných souborů pro konkrétní zadání. Zkontrolujte, zda je projekt přeložitelný.  
 
 ### Hodnocení
 Hodnocení projektu:
@@ -85,7 +85,8 @@ Archív bude obsahovať:
 
 ##### Literatúra:
 
-- [1] (https://gitlab.com/wireshark/wireshark/-/wikis/Lua)
+- [1] (https://gitlab.com/wireshark/w
+reshark/-/wikis/Lua)
 - [2] (https://gitlab.com/wireshark/wireshark/-/wikis/Lua/Dissectors)
 - [3] (https://gitlab.com/wireshark/wireshark/-/wikis/Lua/Examples)
 - [4] (https://www.fit.vut.cz/study/theses/citations/.cs)
