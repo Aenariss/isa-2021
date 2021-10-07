@@ -64,16 +64,24 @@ Parsed_args parse_args(int argc, char *argv[]) {
         exit(1);
     }
 
+    std::regex reg("^-");
+    std::smatch result_match;
 
     for (int i = 1; i < argc; i++) {
 
+        std::string str(argv[i]);
         // Kontrola, ze zacina parametr '-', pak jestli tam je nejake pismenko mimo h,p,a (unknown switch)
         // jestlize je tam h, printuju help
         // jestlize je tam p a/nebo a, dalsi parametr je oboji - port i addr
         // hned prvni parametr, kontroluju, jestli ma i argument, jinak error
         // jedu po pismenkach, hledam nejake, ktere neznam, pripadne vyrizuju ty co znam
 
-        
+        (if std::regex_search(str, result_match, reg)) {
+            size_t length = strlen(argv[i]);
+            for (size_t k = 0; k < length; k++) {
+                if (argv[i][k] == )
+            }
+        }
 
         if (!strcmp(argv[i], "register")) {
             if (i+2 > argc-1 || i+2 < argc-1 || !(port) || !(addr)) {
