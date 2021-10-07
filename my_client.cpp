@@ -67,6 +67,14 @@ Parsed_args parse_args(int argc, char *argv[]) {
 
     for (int i = 1; i < argc; i++) {
 
+        // Kontrola, ze zacina parametr '-', pak jestli tam je nejake pismenko mimo h,p,a (unknown switch)
+        // jestlize je tam h, printuju help
+        // jestlize je tam p a/nebo a, dalsi parametr je oboji - port i addr
+        // hned prvni parametr, kontroluju, jestli ma i argument, jinak error
+        // jedu po pismenkach, hledam nejake, ktere neznam, pripadne vyrizuju ty co znam
+
+        
+
         if (!strcmp(argv[i], "register")) {
             if (i+2 > argc-1 || i+2 < argc-1 || !(port) || !(addr)) {
                 std::cout << "register <username> <password>\n";
@@ -139,7 +147,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
 
         else if (!strcmp(argv[i], "-a") || !strcmp(argv[i], "--addr")) {
             if (i+1 > argc-1) {
-                std::cout << "client: expects <command> [<args>] ... on the command line, given 0 arguments\n";
+                std::cout << "client: the \"-a\" option needs 1 argument, but 0 provided\n";
                 exit(1);
             }
             else {
@@ -150,7 +158,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         
         else if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "--port")) {
             if (i+1 > argc-1) {
-                std::cout << "client: expects <command> [<args>] ... on the command line, given 0 arguments\n";
+                std::cout << "client: the \"-p\" option needs 1 argument, but 0 provided\n";
                 exit(1);
             }
             else {
@@ -435,13 +443,13 @@ void send_and_receive(Parsed_args args) {
             int res = inet_pton(AF_INET, inet_ntoa(*(struct in_addr*)he->h_addr), &serv_addr.sin_addr);
             if (res <= 0) {
                 // Tohle by teoreticky nemelo nastat
-                std::cout << "Couldnt open a connection\n";
+                std::cout << "Couldnt translate hostname\n";
                 exit(1);
             }
         }
     }
 
-    int connection = connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+    int connection = connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
     if (connection == -1) {
         std::cout << "Couldnt open a connection\n";
         exit(1);
