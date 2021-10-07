@@ -18,17 +18,26 @@
 void print_help() {
     std::cout << "usage: client [ <option> ... ] <command> [<args>] ...\n\n";
     std::cout << "<option> is one of\n\n";
-    std::cout << "    -a <addr>, --address <addr>\n        Server hostname or address to connect to\n";
-    std::cout << "    -p <port>, --port <port>\n        Server port to connect to\n";
-    std::cout << "    --help, -h\n        Show this help\n";
-    std::cout << "    --\n";
-    std::cout << "        Do not treat any remaining argument as a switch (at this level)\n\n";
-    std::cout << "Multiple single-letter switches can be combined after\n";
-    std::cout << "one `-`. For example, `-h-` is the same as `-h --`.\n";
-    std::cout << "Supported commands:\n";
-    std::cout << "    register <username> <password>\n";
-    std::cout << "    login <username> <password>\n";
-    std::cout << "    list\n    send <recipient> <subject> <body>\n    fetch <id>\n    logout\n";
+    std::cout << "   -a <addr>, --address <addr>\n     Server hostname or address to connect to\n";
+    std::cout << "   -p <port>, --port <port>\n     Server port to connect to\n";
+    std::cout << "   --help, -h\n     Show this help\n";
+    std::cout << "   --\n";
+    std::cout << "    Do not treat any remaining argument as a switch (at this level)\n\n";
+    std::cout << " Multiple single-letter switches can be combined after\n";
+    std::cout << " one `-`. For example, `-h-` is the same as `-h --`.\n";
+    std::cout << " Supported commands:\n";
+    std::cout << "   register <username> <password>\n";
+    std::cout << "   login <username> <password>\n";
+    std::cout << "   list\n   send <recipient> <subject> <body>\n   fetch <id>\n   logout\n";
+}
+
+bool is_number(std::string string) {
+    size_t limit = string.length();
+    for (size_t i = 0; i < limit; i++) {
+        if (!(isdigit(string[i])))
+            return false;
+    }
+    return true;
 }
 
 struct Send_cmds {
@@ -64,24 +73,53 @@ Parsed_args parse_args(int argc, char *argv[]) {
         exit(1);
     }
 
-    std::regex reg("^-");
+    std::regex switch_reg("^-");
     std::smatch result_match;
 
     for (int i = 1; i < argc; i++) {
 
         std::string str(argv[i]);
-        // Kontrola, ze zacina parametr '-', pak jestli tam je nejake pismenko mimo h,p,a (unknown switch)
-        // jestlize je tam h, printuju help
-        // jestlize je tam p a/nebo a, dalsi parametr je oboji - port i addr
-        // hned prvni parametr, kontroluju, jestli ma i argument, jinak error
-        // jedu po pismenkach, hledam nejake, ktere neznam, pripadne vyrizuju ty co znam
-
-        (if std::regex_search(str, result_match, reg)) {
+        if (std::regex_search(str, result_match, switch_reg)) {
             size_t length = strlen(argv[i]);
-            for (size_t k = 0; k < length; k++) {
-                if (argv[i][k] == )
+            for (size_t k = 1; k < length; k++) {
+
+                if (argv[i][k] == 'h') {
+                    print_help();
+                    exit(0);
+                }
+                else if (argv[i][k] == 'p') {
+                    if (i+1 > argc-1) {
+                        std::cout << "client: the \"-p\" option needs 1 argument, but 0 provided\n";
+                        exit(1);
+                    }
+                    else {
+                        port = argv[i+1];
+                        // Port a jeho kontrola maji prednost pred vsim ostatnim, podle ref. reseni
+                        if(!(is_number(port))) {
+                            std::cout << "Port number is not a string\n";
+                            exit(1);
+                        }
+                    }
+                }
+                else if (argv[i][k] == 'a') {
+                    if (i+1 > argc-1) {
+                        std::cout << "client: the \"-a\" option needs 1 argument, but 0 provided\n";
+                        exit(1);
+                    }
+                    else {
+                        addr = argv[i+1];
+                    }
+                }
+                else {
+                    std::cout << "client: unknown switch: -" << argv[i][k] << '\n';
+                    exit(1); 
+                }
             }
         }
+        // Jestlize jsem nasel port nebo adresu uz pri multi-prepinaci, musim se posunout o 2
+        // 1 za zpracovany multiprepinac, 1 za zpracovany argument
+        if (port || addr)
+            i+=2;
 
         if (!strcmp(argv[i], "register")) {
             if (i+2 > argc-1 || i+2 < argc-1 || !(port) || !(addr)) {
@@ -191,7 +229,6 @@ Parsed_args parse_args(int argc, char *argv[]) {
         exit(1);
     }
 
-    // Nechat co mam jak je, pridat if jesatli zacina '-' a potom zparsovat (do toho ifu dat moje p, a, h)
     return Parsed_args{user_name, user_password, recipient, subject, body, id,
                        reg, list, send, fetch, logout, login, addr, port};
 }
@@ -475,21 +512,11 @@ void send_and_receive(Parsed_args args) {
     print_response(args, buffer);
 }
 
-bool is_number(std::string string) {
-    size_t limit = string.length();
-    for (size_t i = 0; i < limit; i++) {
-        if (!(isdigit(string[i])))
-            return false;
-    }
-    return true;
-}
-
 void check_args(Parsed_args args) {
     if (!(is_number(args.port))) {
         std::cout << "Port number is not a string\n";
         exit(1);
     }
-    return;
 }
 
 int main(int argc, char **argv) {
