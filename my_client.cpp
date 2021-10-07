@@ -16,19 +16,19 @@
 #include "base64.h"
 
 void print_help() {
-    printf("usage: client [ <option> ... ] <command> [<args>] ...\n\n");
-    printf("<option> is one of\n\n");
-    printf("    -a <addr>, --address <addr>\n        Server hostname or address to connect to\n");
-    printf("    -p <port>, --port <port>\n        Server port to connect to\n");
-    printf("    --help, -h\n        Show this help\n");
-    printf("    --\n");
-    printf("        Do not treat any remaining argument as a switch (at this level)\n\n");
-    printf("Multiple single-letter switches can be combined after\n");
-    printf("one `-`. For example, `-h-` is the same as `-h --`.\n");
-    printf("Supported commands:\n");
-    printf("    register <username> <password>\n");
-    printf("    login <username> <password>\n");
-    printf("    list\n    send <recipient> <subject> <body>\n    fetch <id>\n    logout\n");
+    std::cout << "usage: client [ <option> ... ] <command> [<args>] ...\n\n";
+    std::cout << "<option> is one of\n\n";
+    std::cout << "    -a <addr>, --address <addr>\n        Server hostname or address to connect to\n";
+    std::cout << "    -p <port>, --port <port>\n        Server port to connect to\n";
+    std::cout << "    --help, -h\n        Show this help\n";
+    std::cout << "    --\n";
+    std::cout << "        Do not treat any remaining argument as a switch (at this level)\n\n";
+    std::cout << "Multiple single-letter switches can be combined after\n";
+    std::cout << "one `-`. For example, `-h-` is the same as `-h --`.\n";
+    std::cout << "Supported commands:\n";
+    std::cout << "    register <username> <password>\n";
+    std::cout << "    login <username> <password>\n";
+    std::cout << "    list\n    send <recipient> <subject> <body>\n    fetch <id>\n    logout\n";
 }
 
 struct Send_cmds {
@@ -60,7 +60,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
     addr = port = nullptr;
 
     if (argc == 1) {
-        printf("client: expects <command> [<args>] ... on the command line, given 0 arguments\n");
+        std::cout << "client: expects <command> [<args>] ... on the command line, given 0 arguments\n";
         exit(1);
     }
 
@@ -68,8 +68,8 @@ Parsed_args parse_args(int argc, char *argv[]) {
     for (int i = 1; i < argc; i++) {
 
         if (!strcmp(argv[i], "register")) {
-            if (i+2 > argc-1 || i+2 < argc-1) {
-                printf("register <username> <password>\n");
+            if (i+2 > argc-1 || i+2 < argc-1 || !(port) || !(addr)) {
+                std::cout << "register <username> <password>\n";
                 exit(1);
             }
             else {
@@ -80,8 +80,8 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(argv[i], "login")) {
-            if (i+2 > argc-1 || i+2 < argc-1) {
-                printf("login <username> <password>\n");
+            if (i+2 > argc-1 || i+2 < argc-1 || !(port) || !(addr)) {
+                std::cout << "login <username> <password>\n";
                 exit(1);
             }
             else {
@@ -91,8 +91,8 @@ Parsed_args parse_args(int argc, char *argv[]) {
             }
         }
         else if (!strcmp(argv[i], "list")) {
-            if (i < argc-1) {
-                printf("list\n");
+            if (i < argc-1 || !(port) || !(addr)) {
+                std::cout << "list\n";
                 exit(1);
             }
             list = true;
@@ -100,8 +100,8 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
         
         else if (!strcmp(argv[i], "send")) {
-            if (i+3 > argc-1) {
-                printf("send <recipient> <subject> <body>\n");
+            if (i+3 > argc-1 || !(port) || !(addr)) {
+                std::cout << "send <recipient> <subject> <body>\n";
                 exit(1);
             }
             else {
@@ -115,8 +115,8 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(argv[i], "fetch")) {
-            if (i+1 > argc-1) {
-                printf("fetch <id>\n");
+            if (i+1 > argc-1 || !(port) || !(addr)) {
+                std::cout << "fetch <id>\n";
                 exit(1);
             }
             else {
@@ -127,8 +127,8 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(argv[i], "logout")) {
-            if (i < argc-1) {
-                printf("logout\n");
+            if (i < argc-1 || !(port) || !(addr)) {
+                std::cout << "logout\n";
                 exit(1);
             }
             else {
@@ -139,7 +139,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
 
         else if (!strcmp(argv[i], "-a") || !strcmp(argv[i], "--addr")) {
             if (i+1 > argc-1) {
-                printf("client: expects <command> [<args>] ... on the command line, given 0 arguments\n");
+                std::cout << "client: expects <command> [<args>] ... on the command line, given 0 arguments\n";
                 exit(1);
             }
             else {
@@ -150,7 +150,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         
         else if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "--port")) {
             if (i+1 > argc-1) {
-                printf("client: expects <command> [<args>] ... on the command line, given 0 arguments\n");
+                std::cout << "client: expects <command> [<args>] ... on the command line, given 0 arguments\n";
                 exit(1);
             }
             else {
@@ -165,13 +165,13 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else {
-            printf("unknown command\n");
+            std::cout << "unknown command\n";
             exit(1);
         }
     }
 
     if (!reg && !list && !send && !fetch && !logout && !login) {
-        printf("client: expects <command> [<args>] ... on the command line, given 0 arguments\n");
+        std::cout << "client: expects <command> [<args>] ... on the command line, given 0 arguments\n";
         exit(1);
     }
 
@@ -185,7 +185,7 @@ std::string read_user_token() {
 
     std::ifstream f("login-token");
     if (!f.is_open()) {
-        printf("Not logged in\n");
+        std::cout << "Not logged in\n";
         exit(1);
     }
     std::stringstream token;
@@ -340,37 +340,42 @@ void print_response(Parsed_args args, char* buffer) {
         // User logged in + vytvori login-token
         if (args.login) {
             std::string body = get_nth_part_of_response(buffer_string, 1);
-            printf("SUCCESS: %s\n", body.c_str());
+            std::cout << "SUCCESS: " << body << '\n';
             std::string token = get_nth_part_of_response(buffer_string, 2);
             std::ofstream login_token("login-token");
             login_token << "\"" << token << "\"";
             login_token.close();
-        }
-        // registered user <user>
+        }   // registered user <user>
         else if (args.reg) {
             std::string body = get_nth_part_of_response(buffer_string, 1);
-            printf("SUCCESS: %s\n", body.c_str());
-        }
-        else if (args.list) { // SUCCESS: zpravy
-            printf("SUCCESS:\n");
+            std::cout << "SUCCESS: " << body << '\n';
+        }   // SUCCESS: zpravy
+        else if (args.list) {
+            std::cout << "SUCCESS:\n";
             print_list_messages(buffer_string);
 
         }   // message sent
         else if (args.send) {
             std::string body = get_nth_part_of_response(buffer_string, 1);
-            printf("SUCCESS: %s\n", body.c_str());
+            std::cout << "SUCCESS: " << body << '\n';
         }
         else if (args.fetch) {
+            std::string sender = get_nth_part_of_response(buffer_string, 1);
+            std::string subject = get_nth_part_of_response(buffer_string, 2);
+            std::string body = get_nth_part_of_response(buffer_string, 3);
 
+            std::cout << "SUCCESS:\n\n" << "From: " << sender << '\n';
+            std::cout << "Subject: " << subject << "\n\n";
+            std::cout << body;
         }   // logged out + smaze login-token
         else if (args.logout) {
-            if (remove( "login-token" ) != 0) {
-                printf("Internal client error when logging out!\n");
+            if (remove("login-token") != 0) {
+                std::cout << "Internal client error when logging out!\n";
                 exit(1);
             }
             std::string body = get_nth_part_of_response(buffer_string, 1);
-            printf("SUCCESS: %s\n", body.c_str());
-        }   
+            std::cout << "SUCCESS: " << body << '\n';
+        }
 
     }
     else if (std::regex_search(buffer_string, result_match, error_reg)) {
@@ -384,11 +389,11 @@ void print_response(Parsed_args args, char* buffer) {
         */
 
         std::string body = get_nth_part_of_response(buffer_string, 1);
-        printf("ERROR: %s\n", body.c_str());
+        std::cout << "ERROR: " << body << '\n';
     }
     
     else {
-        printf("Unknown error\n");
+        std::cout << "Unknown internal error (received wrong packet)\n";
         exit(1);
     }
 }
@@ -406,7 +411,7 @@ void send_and_receive(Parsed_args args) {
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
-        printf("Couldnt open a connection\n");
+        std::cout << "Couldnt open a connection\n";
         exit(1);
     }
 
@@ -422,7 +427,7 @@ void send_and_receive(Parsed_args args) {
         auto he = gethostbyname (args.addr);
         // Kdyz to neni ani hostname, tak nic
         if (he == NULL) {
-            printf("tcp-connect: host not found\n");
+            std::cout << "tcp-connect: host not found\n";
             exit(1);
         }
         else {
@@ -430,7 +435,7 @@ void send_and_receive(Parsed_args args) {
             int res = inet_pton(AF_INET, inet_ntoa(*(struct in_addr*)he->h_addr), &serv_addr.sin_addr);
             if (res <= 0) {
                 // Tohle by teoreticky nemelo nastat
-                printf("Couldnt open a connection\n");
+                std::cout << "Couldnt open a connection\n";
                 exit(1);
             }
         }
@@ -438,7 +443,7 @@ void send_and_receive(Parsed_args args) {
 
     int connection = connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
     if (connection == -1) {
-        printf("Couldnt open a connection\n");
+        std::cout << "Couldnt open a connection\n";
         exit(1);
     }
 
@@ -446,7 +451,7 @@ void send_and_receive(Parsed_args args) {
 
     int valread = read(sock, buffer, 2048);
     if (valread == -1) {
-        printf("Unknown error\n");
+        std::cout << "Unknown error during packet reading\n";
         exit(1);
     }
 
@@ -465,7 +470,7 @@ bool is_number(std::string string) {
 
 void check_args(Parsed_args args) {
     if (!(is_number(args.port))) {
-        printf("Port number is not a string\n");
+        std::cout << "Port number is not a string\n";
         exit(1);
     }
     return;
