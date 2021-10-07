@@ -289,15 +289,33 @@ std::string get_nth_part_of_response(std::string response, int part) {
 void print_list_messages(std::string buffer_string) {
     std::vector<std::string> list_of_strings;
     int first_bracket, second_bracket;
-    for(int i = 0; i < buffer_string.length(); i++) {
-        if (buffer_string[i] == 123)
+    first_bracket = second_bracket = -1;
+    bool flag1, flag2;
+    flag1 = flag2 = false;
+    for(unsigned int i = 1; i < buffer_string.length()-1; i++) {
+
+        if (buffer_string[i] == '(') {
             first_bracket = i;
-        if (buffer_string[i] == 125)
+            flag1 = true;
+        }
+        else if (buffer_string[i] == ')') {
             second_bracket = i;
-        
-        // vytvorit substring a appendnout do vektoru
-        // prolezt pak vsecky substringy a vypisovat je
+            flag2 = true;
+        }
+
+        if (flag1 && flag2) {
+            std::string message = buffer_string.substr(first_bracket+1, (second_bracket-first_bracket-1));
+            list_of_strings.push_back(message);
+            flag1 = flag2 = false;
+        }
     }
+
+    for (std::string message : list_of_strings) {
+        std::cout << message[0] << ':' << '\n';
+        std::cout << "  From: " <<  get_nth_part_of_response(message, 1) << '\n';
+        std::cout << "  Subject: " << get_nth_part_of_response(message, 2) << '\n';
+    }
+
 
 }
 
