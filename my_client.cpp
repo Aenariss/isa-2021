@@ -287,7 +287,18 @@ std::string get_nth_part_of_response(std::string response, int part) {
 }
 
 void print_list_messages(std::string buffer_string) {
-    
+    std::vector<std::string> list_of_strings;
+    int first_bracket, second_bracket;
+    for(int i = 0; i < buffer_string.length(); i++) {
+        if (buffer_string[i] == 123)
+            first_bracket = i;
+        if (buffer_string[i] == 125)
+            second_bracket = i;
+        
+        // vytvorit substring a appendnout do vektoru
+        // prolezt pak vsecky substringy a vypisovat je
+    }
+
 }
 
 void print_response(Parsed_args args, char* buffer) {
