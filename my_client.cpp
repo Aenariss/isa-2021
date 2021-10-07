@@ -75,6 +75,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
 
     std::regex switch_reg("^-");
     std::smatch result_match;
+    bool found = false;
 
     for (int i = 1; i < argc; i++) {
 
@@ -118,8 +119,10 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
         // Jestlize jsem nasel port nebo adresu uz pri multi-prepinaci, musim se posunout o 2
         // 1 za zpracovany multiprepinac, 1 za zpracovany argument
-        if (port || addr)
+        if ((port || addr) && !(found)) {
+            found = true;
             i+=2;
+        }
 
         if (!strcmp(argv[i], "register")) {
             if (i+2 > argc-1 || i+2 < argc-1 || !(port) || !(addr)) {
@@ -220,6 +223,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
 
         else {
             std::cout << "unknown command\n";
+            std::cout << argv[i] << i << '\n';
             exit(1);
         }
     }
