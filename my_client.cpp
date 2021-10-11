@@ -363,10 +363,12 @@ void print_list_messages(std::string buffer_string) {
         if (flag1 && flag2) {
             std::string message = buffer_string.substr(first_bracket+1, (second_bracket-first_bracket-1));
             list_of_strings.push_back(message);
+            if (message == "") {
+                return;
+            }
             flag1 = flag2 = false;
         }
     }
-
     for (std::string message : list_of_strings) {
         std::cout << message[0] << ':' << '\n';
         std::cout << "  From: " <<  get_nth_part_of_response(message, 1) << '\n';
