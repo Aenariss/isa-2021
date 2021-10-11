@@ -1,11 +1,13 @@
 -- https://mika-s.github.io/wireshark/lua/dissector/2018/12/30/creating-port-independent-wireshark-dissectors-in-lua.html
+-- Tenhle hovnokod refaktorizovat
+-- unfinished capture == spatny string.find, neescaptnuty charakter (escape zapomoci %)
 
 isa_protocol = Proto("ISA", "ISA Project Protocol")
 
--- Header fields
+-- Jednotlive prvky protokolu, ktere se budou zobrazovat v ramci dissectu jednotlivych paketu
 status = ProtoField.string("isa_protocol.status", "Response status")
 command = ProtoField.string("isa_protocol.command", "Operation code")
-message = ProtoField.string("isa_protocol.error_message", "Message")
+response = ProtoField.string("isa_protocol.message", "Message")
 body = ProtoField.string("isa_protocol.body", "Body")
 type = ProtoField.string("isa_protocol.type", "Type")
 msg_length = ProtoField.string("isa_protocol.msg_length", "Length")
@@ -16,15 +18,15 @@ recipient = ProtoField.string("isa_protocol.recipient", "Message recipient")
 subject = ProtoField.string("isa_protocol.subject", "Message subject")
 body_message = ProtoField.string("isa_protocol.body", "Message body")
 message_number = ProtoField.string("isa_protocol.body", "Message ID")
+request_opcode = ProtoField.string("isa_protocol.body", "Response to Opcode")
 
-isa_protocol.fields = { status, command, error_message, body, type, msg_length, username, password, user_id, recipient, subject, body_message, message_number }
+isa_protocol.fields = { status, command, response, body, type, msg_length, username, password, user_id, recipient, subject, body_message, message_number, request_opcode }
 
 local function get_status(msg)
-    -- wireshark ma integrovanou lua konzoli: Tools -> Lua
-    -- V te hledat vypisy a errory a prijit na to, proc todle nejde
     local message_name = "unknown"
     local find = tostring(msg)
     local find = Struct.fromhex(find)
+    print(find)
 
     if string.find(find, "ok") then message_name = "ok"
     elseif string.find(find, "err") then message_name = "error" 
@@ -39,7 +41,28 @@ local function get_status(msg)
     return message_name
 end
 
-local function get_quote_index(buffer, n)
+local function heuristic_checker(buffer, pinfo, tree)
+    -- guard for length
+    length = buffer:len()
+    if length < 5 then return false end -- takhle neberu random SYN/ACK pakety, ktere nemaji telo
+
+    -- ~= znamena !=
+    local potential_status
+    if length >= 10 then 
+        potential_status = buffer(0,10)
+    else
+        potential_status = buffer(0,length)
+    end
+
+    local status = get_status(potential_status)
+    if status ~= "unknown"
+    then
+        isa_protocol.dissector(buffer, pinfo, tree)
+        return true
+    else return false end
+end
+
+local function get_char_index(buffer, n, needle)
     
     local buff_len = buffer:len()
     local first_quote = -1
@@ -56,7 +79,6 @@ local function get_quote_index(buffer, n)
     local k = 1
     local flag = 0
     local remains_to_read = buff_len
-
     while k <= buff_len do
         if remains_to_read >= 36 and flag == 0 then
             my_string = tostring(buffer(0, 36))
@@ -69,7 +91,7 @@ local function get_quote_index(buffer, n)
         end
 
         -- 
-        mod = k % 36
+        local mod = k % 36
         if mod == 0 then
 
             remains_to_read = remains_to_read - 36
@@ -86,26 +108,44 @@ local function get_quote_index(buffer, n)
 
         local char = my_string:sub(i,i)
         if (i == 36) then i = 0 end
-        if char == "\"" then 
-            counter = counter + 1
-            if first_quote ~= -1 then
-                second_quote = k
-                break
+        if needle == '(' then
+            if char == ')' then 
+                if first_quote ~= -1 then
+                    second_quote = k
+                    break
+                end
             end
-            if counter == limit then
-                first_quote = k
+            if char == '(' then 
+                counter = counter + 1
+                if counter == n then
+                    first_quote = k 
+                end
+            end
+
+        else 
+            if char == needle then 
+                counter = counter + 1
+                if first_quote ~= -1 then
+                    second_quote = k
+                    break
+                end
+                if counter == limit then
+                    first_quote = k
+                end
             end
         end
         i = i + 1
         k = k + 1
     end
+    if first_quote == -1 then first_quote = 0 end
+    if second_quote == -1 then second_quote = 0 end
     return first_quote, second_quote
 end
 
 local function get_number(buffer)
     local buff_len = buffer:len()
     local my_string = tostring(buffer(0, buff_len))
-    --local my_string = Struct.fromhex(my_string)
+    local my_string = Struct.fromhex(my_string)
     local flag = 0
     local n_begin = -1
     local n_end = -1
@@ -117,58 +157,116 @@ local function get_number(buffer)
             if (flag == 0) then n_begin = i flag = 1 end
         end
     end
-    if n_end == -1 then n_end = 1 end
+    if n_end == -1 then n_end = n_begin+1 end
     return n_begin, n_end
 
 end
 
-local function heuristic_checker(buffer, pinfo, tree)
-    -- guard for length
-    length = buffer:len()
-    if length < 5 then return false end -- takhle neberu random SYN/ACK pakety, ktere nemaji telo
-
-    -- ~= znamena !=
-    local potential_status = buffer(0,10)
-
-    local status = get_status(potential_status)
-    if status ~= "unknown"
-    then
-        isa_protocol.dissector(buffer, pinfo, tree)
-        return true
-    else return false end
-end
-
 function add_quote_to_tree(subtree, buffer, max_length, n, field)
-    local first_quote, second_quote = get_quote_index(buffer(0,max_length-1), n)
+    local first_quote, second_quote = get_char_index(buffer(0,max_length-1), n, '\"')
     subtree:add(field, buffer(first_quote, second_quote-first_quote-1))
     return first_quote, second_quote
 end
 
 function add_number_to_tree(subtree, buffer, max_length, field, prev_quote)
     local begin_n, end_n = get_number(buffer(prev_quote, max_length-prev_quote-1))
-    subtree:add(field, buffer(prev_quote+begin_n, end_n-begin_n))
-    print(prev_quote+begin_n, end_n-begin_n)
+    subtree:add(field, buffer(prev_quote+begin_n-1, end_n-begin_n))
 end
 
 function isa_protocol.dissector(buffer, pinfo, tree)
     local max_length = buffer:len()
-    if max_length == 0 then return end
+    if max_length == 0 then 
+        return 
+    end
 
     pinfo.cols.protocol = isa_protocol.name
 
     local subtree = tree:add(isa_protocol, buffer(), "ISA Protocol Payload")
 
-    msg_type = get_status(buffer(0,10))
+    local msg_type
+    if max_length < 10 then msg_type = get_status(buffer(0, max_length)) 
+    else msg_type = get_status(buffer(0,10)) end
 
-    if (msg_type == "ok") then
-        subtree:add(type):append_text("Response")
-        subtree:add(status, buffer(1,3))
-        subtree:add(body, buffer(4, max_length-5))
+    if (msg_type == "ok" or msg_type == "error") then
 
-    elseif (msg_type == "error") then
         subtree:add(type):append_text("Response")
-        subtree:add(status, buffer(1,4))
-        subtree:add(body, buffer(5, max_length-6))
+
+        local response_body = buffer(0, max_length-1)
+        local my_string = tostring(response_body)
+        local my_string = Struct.fromhex(my_string)
+
+        if (msg_type == "ok") then 
+            subtree:add(status, buffer(1,3))
+
+            if (string.find(my_string, "%(ok %(%)")) then 
+                subtree:add(request_opcode):append_text("list")
+                subtree:add(body, buffer(0, max_length))
+            
+            elseif(string.find(my_string, "ok %(%(")) then
+                subtree:add(request_opcode):append_text("list")
+                local begin_end_point, end_end_point = string.find(tostring(buffer(max_length-3, 3)), "2929")
+                local endpoint = max_length-3+1
+                local initial_offset = 5   -- kvuli tomu, at nemam problemy s dvojtyma zavorkama
+                local i = initial_offset
+                local k = 1
+                --while 
+                while i < endpoint do
+                    local left_bracket, right_bracket = get_char_index(buffer(initial_offset, max_length-7), k, "(")
+                    local response_body = buffer(left_bracket+initial_offset, right_bracket-left_bracket-1)
+                    local my_string = tostring(response_body)
+                    local my_string = Struct.fromhex(my_string)
+                    local beg, endd = get_number(buffer(left_bracket+initial_offset, 6))    -- 6 mist pro cislo max, kvuli tomu, ze uzivatel muze mit cislo i v recipientovi -- ID
+                    local first_quote, second_quote = get_char_index(buffer(left_bracket+initial_offset, right_bracket-left_bracket-1), 1, "\"")    -- recipient
+                    local first_quote_msg, second_quote_msg = get_char_index(buffer(left_bracket+initial_offset, right_bracket-left_bracket-1), 2, "\"")  -- subject
+                    k = k + 1
+                    subtree:add(message_number, buffer(beg+left_bracket+initial_offset-1, endd-beg))
+                    subtree:add(recipient, buffer(first_quote+left_bracket+initial_offset, second_quote-first_quote-1))
+                    subtree:add(subject, buffer(first_quote_msg+left_bracket+initial_offset, second_quote_msg-first_quote_msg-1))
+                    i = right_bracket + 2 + initial_offset  -- 2 kvuli tomu, ze je na zaccatku odecitam od max_length (kvuli funkcionalite), initial_offset self-explanatory
+                    if (right_bracket == 0) then break end -- proti zacykleni
+                end
+
+            -- fetch bude jeste podobny tomudle ok ("
+            elseif(string.find(my_string, "%(ok %(")) then
+                local initial_offset = 1
+                subtree:add(request_opcode):append_text("fetch")
+                local left_bracket, right_bracket = get_char_index(buffer(1, max_length-1), 1, "(")
+                local response_body = buffer(left_bracket+initial_offset, right_bracket-left_bracket-1)
+                local my_string = tostring(response_body)
+                local my_string = Struct.fromhex(my_string)
+                local first_quote, second_quote = get_char_index(buffer(left_bracket+initial_offset, right_bracket-left_bracket-1), 1, "\"")    -- recipient
+                local first_quote_msg, second_quote_msg = get_char_index(buffer(left_bracket+initial_offset, right_bracket-left_bracket-1), 2, "\"")  -- subject
+                local first_quote, second_quote = get_char_index(buffer(left_bracket+initial_offset, right_bracket-left_bracket-1), 3, "\"")    -- body
+                subtree:add(recipient, buffer(first_quote+left_bracket+initial_offset, second_quote-first_quote-1))
+                subtree:add(subject, buffer(first_quote_msg+left_bracket+initial_offset, second_quote_msg-first_quote_msg-1))
+                subtree:add(body_message, buffer(first_quote+left_bracket+initial_offset, second_quote-first_quote-1))
+
+            elseif(string.find(my_string, "logged out")) then 
+                subtree:add(request_opcode):append_text("logout")
+                add_quote_to_tree(subtree, buffer, max_length, 1, body)
+
+            elseif(string.find(my_string, "user logged in")) then 
+                subtree:add(request_opcode):append_text("login")
+                add_quote_to_tree(subtree, buffer, max_length, 1, response) -- response message
+                add_quote_to_tree(subtree, buffer, max_length, 2, user_id)
+            
+            elseif(string.find(my_string, "registered user ")) then
+                subtree:add(request_opcode):append_text("register")
+                add_quote_to_tree(subtree, buffer, max_length, 1, response)
+            end
+        
+        else
+            subtree:add(status, buffer(1,4))
+
+            if (string.find(my_string, "incorrect login")) then
+                subtree:add(body, buffer(5,max_length-6))
+            
+            elseif (string.find(my_string, "message id not found")) then
+                subtree:add(request_opcode):append_text("fetch")
+                add_quote_to_tree(subtree, buffer, max_length, 1, body)
+            end
+        end
+
     else
         subtree:add(type):append_text("Request")
         if (msg_type == "reg") then
@@ -187,7 +285,7 @@ function isa_protocol.dissector(buffer, pinfo, tree)
             add_number_to_tree(subtree, buffer, max_length, message_number, second_quote)
 
         elseif (msg_type == "logout") then
-            subtree:add(command, buffer(1,4))
+            subtree:add(command, buffer(1,6))
             add_quote_to_tree(subtree, buffer, max_length, 1, user_id)
 
         elseif (msg_type == "send") then
@@ -199,12 +297,10 @@ function isa_protocol.dissector(buffer, pinfo, tree)
 
         elseif (msg_type == "list") then
             subtree:add(command, buffer(1,4))
-            add_quote_to_tree(subtree, buffer, max_length, 1, body_message)
+            add_quote_to_tree(subtree, buffer, max_length, 1, user_id)
         end
-
     end
     subtree:add(msg_length):append_text(max_length)
-
 end
 
 isa_protocol:register_heuristic("tcp", heuristic_checker)
