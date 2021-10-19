@@ -60,13 +60,18 @@ struct Parsed_args {
     char *addr, *port;
 };
 
+void print_error(Parsed_args args) {
+    std::cout << "  hostname: " << args.addr << '\n';
+    std::cout << "  port number: " << args.port << '\n';
+    exit(1);
+}
+
 Parsed_args parse_args(int argc, char *argv[]) {
     char *user_name, *user_password, *recipient, *subject, *body, *id;
     user_name = user_password = recipient = subject = body = id = nullptr;
     bool reg, list, send, fetch, logout, login;
     reg = list = send = fetch = logout = login = false;
-    char *addr, *port;
-    addr = port = nullptr;
+    std::string addr, port;
 
     if (argc == 1) {
         std::cout << "client: expects <command> [<args>] ... on the command line, given 0 arguments\n";
@@ -119,13 +124,18 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
         // Jestlize jsem nasel port nebo adresu uz pri multi-prepinaci, musim se posunout o 2
         // 1 za zpracovany multiprepinac, 1 za zpracovany argument
-        if ((port || addr) && !(found)) {
+        if ((port.empty() || addr.empty()) && !(found)) {
             found = true;
             i+=2;
         }
+            
+        if (port.empty())
+            port = "32323";
+        if (addr.empty())
+            addr = "localhost";
 
         if (!strcmp(argv[i], "register")) {
-            if (i+2 > argc-1 || i+2 < argc-1 || !(port) || !(addr)) {
+            if (i+2 > argc-1 || i+2 < argc-1 || port.empty() || addr.empty()) {
                 std::cout << "register <username> <password>\n";
                 exit(1);
             }
@@ -137,7 +147,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(argv[i], "login")) {
-            if (i+2 > argc-1 || i+2 < argc-1 || !(port) || !(addr)) {
+            if (i+2 > argc-1 || i+2 < argc-1 || port.empty() || addr.empty()) {
                 std::cout << "login <username> <password>\n";
                 exit(1);
             }
@@ -148,7 +158,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
             }
         }
         else if (!strcmp(argv[i], "list")) {
-            if (i < argc-1 || !(port) || !(addr)) {
+            if (i < argc-1 || port.empty() || addr.empty()) {
                 std::cout << "list\n";
                 exit(1);
             }
@@ -157,7 +167,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
         
         else if (!strcmp(argv[i], "send")) {
-            if (i+3 > argc-1 || !(port) || !(addr)) {
+            if (i+3 > argc-1 || port.empty() || addr.empty()) {
                 std::cout << "send <recipient> <subject> <body>\n";
                 exit(1);
             }
@@ -172,7 +182,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(argv[i], "fetch")) {
-            if (i+1 > argc-1 || !(port) || !(addr)) {
+            if (i+1 > argc-1 || port.empty() || addr.empty()) {
                 std::cout << "fetch <id>\n";
                 exit(1);
             }
@@ -184,7 +194,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(argv[i], "logout")) {
-            if (i < argc-1 || !(port) || !(addr)) {
+            if (i < argc-1 || port.empty() || addr.empty()) {
                 std::cout << "logout\n";
                 exit(1);
             }
@@ -234,7 +244,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
     }
 
     return Parsed_args{user_name, user_password, recipient, subject, body, id,
-                       reg, list, send, fetch, logout, login, addr, port};
+                       reg, list, send, fetch, logout, login, (char*) addr.c_str(), (char*) port.c_str()};
 }
 
 // https://stackoverflow.com/questions/2602013/read-whole-ascii-file-into-c-stdstring
@@ -457,14 +467,19 @@ void print_response(Parsed_args args, char* buffer) {
     }
 }
 
+void check_args(Parsed_args args) {
+    if (!(is_number(args.port))) {
+        std::cout << "Port number is not a string\n";
+        exit(1);
+    }
+}
+
 // https://www.geeksforgeeks.org/socket-programming-cc/
 void send_and_receive(Parsed_args args) {
 
 
     struct sockaddr_in serv_addr;
     char buffer[2048];
-
-    std::string msg = create_tcp_body(args);
 
     //printf("%ld %s\n", strlen(msg), msg);
 
@@ -503,9 +518,11 @@ void send_and_receive(Parsed_args args) {
     int connection = connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
     if (connection == -1) {
         std::cout << "Couldnt open a connection\n";
-        exit(1);
+        print_error(args);
     }
 
+    check_args(args);
+    std::string msg = create_tcp_body(args);
     send(sock, msg.c_str(), msg.length(), 0);
 
     int valread = read(sock, buffer, 2048);
@@ -518,17 +535,9 @@ void send_and_receive(Parsed_args args) {
     print_response(args, buffer);
 }
 
-void check_args(Parsed_args args) {
-    if (!(is_number(args.port))) {
-        std::cout << "Port number is not a string\n";
-        exit(1);
-    }
-}
-
 int main(int argc, char **argv) {
 
     Parsed_args args = parse_args(argc, argv);
-    check_args(args);
     send_and_receive(args);
     return 0;
 }
