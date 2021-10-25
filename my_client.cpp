@@ -522,7 +522,7 @@ void print_response(Parsed_args args, char* buffer) {
     }
     
     else {
-        std::cerr << "Unknown internal error (received wrong packet)\n";
+        std::cerr << "Unknown internal server-side error (client received wrong packet)\n";
         exit(1);
     }
 }
@@ -551,7 +551,7 @@ void send_and_receive(Parsed_args args) {
     hints.ai_flags = 0;              // Nastavuju v podstate jenom kvuli getaddrinfo
     hints.ai_protocol = 0;           // Protokol pro socktype
 
-    // Konverze adresi (i pripadneho hostname) na neco, s cim muzu pracovat
+    // Konverze adresy (i pripadneho hostname) na neco, s cim muzu pracovat
     s = getaddrinfo(args.addr, args.port, &hints, &result);
     if (s != 0) {
         std::cerr << "Error with address resolution \n";
@@ -583,18 +583,29 @@ void send_and_receive(Parsed_args args) {
     std::string msg = create_tcp_body(args);
     send(sock, msg.c_str(), msg.length(), 0);
 
-    int valread = read(sock, buffer, 2048);
-    // Jestlize se nepovedlo zpracovat odpoved, doslo k nejake chybe po ceste paketu
-    if (valread == -1) {
-        std::cerr << "Unknown error during packet reading\n";
-        exit(1);
-    }
+    std::string received_msg = "";
+    int valread = -1;
+
+    // Pokud by byla vysledna zprava moc velka, musim resit i to, ze ji prectu celou
+    do {
+        valread = read(sock, buffer, 2048);
+        std::string tmp_buf (buffer);
+        received_msg += tmp_buf;
+        // Server uz nema co poslat, tak muzu skoncit
+        if (valread == 0)
+            break;
+         // Jestlize se nepovedlo zpracovat odpoved, doslo k nejake chybe po ceste paketu
+        else if (valread == -1) {
+            std::cerr << "Unknown error during packet reading\n";
+            exit(1);
+        }
+    } while (valread > 0);
 
     // Jestlize k chybe nedoslo, muzu uvolnit pamet, vypsat odpoved serveru a skoncit
     close(sock);
     freeaddrinfo(result);
 
-    print_response(args, buffer);
+    print_response(args, (char*) received_msg.c_str());
 }
 
 int main(int argc, char **argv) {
