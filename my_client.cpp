@@ -1,6 +1,5 @@
 // ISA 2021 Projekt - Reverse-engineering neznámeho protokolu 
 // Autor: Vojtech Fiala
-// TODO: vymyslet novy zpusob parsovani odpovedi (esccapnute uvozovky)
 
 #include <iostream>
 #include <tuple>
@@ -129,33 +128,51 @@ Parsed_args parse_args(int argc, char *argv[]) {
     }
 
     unsigned int limit = (unsigned int) argc-1;
-    for (unsigned int i = 0; i < vec.size(); i++) {
+    for (unsigned int i = 0; i < limit; i++) {
 
         if (!std::regex_search(vec[i], result_match, check_reg)) {
             if (std::regex_search(vec[i], result_match, switch_reg)) {
                 size_t length = vec[i].length();
+                int count = 0;
                 for (size_t k = 1; k < length; k++) {
-
+                    
                     if (vec[i][k] == 'h') {
                         print_help();
                         exit(0);
                     }
+
                     else if (vec[i][k] == 'p') {
                         if (i+1 > limit-1) {
                             std::cerr << "client: the \"-p\" option needs 1 argument, but 0 provided\n";
                             exit(1);
                         }
                         else {
-                            port = vec[i+1];
-                            found = true;
-                            // Port a jeho kontrola maji prednost pred vsim ostatnim, podle ref. reseni
-                            if(!(is_number(port))) {
-                                std::cerr << "Port number is not a string\n";
-                                exit(1);
+                            if (count == 0) {
+                                port = vec[i+1];
+                                found = true;
+                                // Port a jeho kontrola maji prednost pred vsim ostatnim, podle ref. reseni
+                                if(!(is_number(port))) {
+                                    std::cerr << "Port number is not a string\n";
+                                    exit(1);
+                                }
+                            }
+                            else {
+                                if (i+2 > limit-1) {
+                                    std::cerr << "client: the \"-p\" option needs 1 argument, but 0 provided\n";
+                                    exit(1);
+                                }
+                                port = vec[i+2];
+                                found = true;
+                                // Port a jeho kontrola maji prednost pred vsim ostatnim, podle ref. reseni
+                                if(!(is_number(port))) {
+                                    std::cerr << "Port number is not a string\n";
+                                    exit(1);
+                                }
                             }
                         }
                     }
                     else if (vec[i][k] == 'a') {
+                        count++;
                         if (i+1 > limit-1) {
                             std::cerr << "client: the \"-a\" option needs 1 argument, but 0 provided\n";
                             exit(1);
@@ -186,7 +203,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
 
 
         if (!strcmp(vec[i].c_str(), "register")) {
-            if (i+2 > limit-1 || i+2 < limit-1 || port.empty() || addr.empty()) {
+            if (i+2 > limit-1 || i+2 < limit-1) {
                 std::cerr << "register <username> <password>\n";
                 exit(1);
             }
@@ -199,7 +216,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(vec[i].c_str(), "login")) {
-            if (i+2 > limit-1 || i+2 < limit-1 || port.empty() || addr.empty()) {
+            if (i+2 > limit-1 || i+2 < limit-1) {
                 std::cerr << "login <username> <password>\n";
                 exit(1);
             }
@@ -211,7 +228,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
             }
         }
         else if (!strcmp(vec[i].c_str(), "list")) {
-            if (i < limit-1 || port.empty() || addr.empty()) {
+            if (i < limit-1) {
                 std::cerr << "list\n";
                 exit(1);
             }
@@ -220,7 +237,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
         
         else if (!strcmp(vec[i].c_str(), "send")) {
-            if (i+3 > limit-1 || port.empty() || addr.empty()) {
+            if (i+3 > limit-1) {
                 std::cerr << "send <recipient> <subject> <body>\n";
                 exit(1);
             }
@@ -234,7 +251,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(vec[i].c_str(), "fetch")) {
-            if (i+1 > limit-1 || port.empty() || addr.empty()) {
+            if (i+1 >= limit) {
                 std::cerr << "fetch <id>\n";
                 exit(1);
             }
@@ -246,7 +263,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(vec[i].c_str(), "logout")) {
-            if (i < limit-1 || port.empty() || addr.empty()) {
+            if (i < limit-1) {
                 std::cerr << "logout\n";
                 exit(1);
             }
@@ -274,6 +291,10 @@ Parsed_args parse_args(int argc, char *argv[]) {
             }
             else {
                 port = vec[i+1];
+                if(!(is_number(port))) {
+                    std::cerr << "Port number is not a string\n";
+                    exit(1);
+                }
                 i++;
             }
         }
@@ -538,7 +559,7 @@ void print_response(Parsed_args args, std::string buffer) {
     }
 }
 
-/* Funkce na kontrolu argumentu, ktera vlastne akorat zkontroluje, jestli je port cislo */
+/* Funkce na kontrolu argumentu, ktera vlastne akorat zkontroluje, jestli je port cislo -- v momentalni fazi USELESS*/
 void check_args(Parsed_args args) {
     if (!(is_number(args.port))) {
         std::cerr << "Port number is not a string\n";
