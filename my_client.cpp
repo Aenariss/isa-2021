@@ -45,16 +45,19 @@ bool is_number(std::string string) {
     return true;
 }
 
+/* Pomocna struktura pro ukladani dat zpravy typu "send" */
 struct Send_cmds {
     char* recipient;
     char* subject;
     char* body;
 };
 
+/* Funkce pro naplneni pomocne struktury pro zpracovani prikazu "send" */
 Send_cmds Send_cmd(int index, char **args) {
     return Send_cmds{args[index+1], args[index+2], args[index+3]};
 }
 
+/* Funkce pouzivana pro nacteni uzivatelskych dat (jmeno a heslo) */
 std::tuple<char*, char*> get_user_data(int index, char **args) {
     return std::make_tuple(args[index+1], args[index+2]);
 }
@@ -71,6 +74,27 @@ void print_error(Parsed_args args) {
     std::cout << "  hostname: " << args.addr << '\n';
     std::cout << "  port number: " << args.port << '\n';
     exit(1);
+}
+
+/* Funkce pro escapovani nekterych charakteru (viz referencni klient) */
+std::string escape_characters(std::string message) {
+    for (unsigned int i = 0; i < message.length(); i++) {
+        // Jestlize je nejaky charakter "\", musim zkontrolovat chrakter hned za nim
+        if (message[i] == 92) {
+            // Za \ se musi nachazet i nejaky znak
+            if ((i + 1) >= message.length()) {
+                std::cerr << "error while escaping characters \n";
+                exit(1);
+            }
+            else {
+                if (message[i+1] == 'n') {
+                    message = message.substr(0, i) + '\n' + message.substr(i+2, message.length()-i);
+                }
+            }
+        }
+    }
+    print(message)
+    return message;
 }
 
 /* Funkce pro zpracovani argumentu */
@@ -140,7 +164,8 @@ Parsed_args parse_args(int argc, char *argv[]) {
         if ((port.empty() || addr.empty()) && (found)) {
             i+=2;
         }
-            
+        
+        // Jinak prirazuju defaultni hodnoty
         if (port.empty())
             port = "32323";
         if (addr.empty())
@@ -246,7 +271,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
 
         else {
             std::cerr << "unknown command\n";
-            std::cerr << argv[i] << i << '\n';
+            std::cerr << argv[i] << '\n';
             exit(1);
         }
     }
@@ -256,6 +281,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         exit(1);
     }
 
+    // Vracim strukturu se vsema argumentama - kdyz je uzivatel nezadal, jsou prazdne (nullptr)
     return Parsed_args{user_name, user_password, recipient, subject, body, id,
                        reg, list, send, fetch, logout, login, (char*) addr.c_str(), (char*) port.c_str()};
 }
@@ -357,6 +383,7 @@ std::string create_tcp_body(Parsed_args args) {
     return msg;
 }
 
+/* Funkce pro ziskani N-te casti odpovedi (casti uvnitr uvozovek) */
 std::string get_nth_part_of_response(std::string response, int part) {
     int counter = 0;
     int begin;
@@ -380,6 +407,7 @@ std::string get_nth_part_of_response(std::string response, int part) {
     return result;
 }
 
+/* Funkce pro vypsani odpovedi na prikaz "list" */
 void print_list_messages(std::string buffer_string) {
     std::vector<std::string> list_of_strings;
     int first_bracket, second_bracket;
@@ -415,13 +443,13 @@ void print_list_messages(std::string buffer_string) {
 
 }
 
+/* Vypsani odpovedi na ostatni prikazy */
 void print_response(Parsed_args args, char* buffer) {
     std::regex error_reg("^\\(err");
     std::regex ok_reg("^\\(ok+");
     std::smatch result_match;
     std::string buffer_string(buffer);
 
-    //char* sub = strstr(buffer, "(ok");
 
     if (std::regex_search(buffer_string, result_match, ok_reg)) {
         /* 
@@ -459,6 +487,9 @@ void print_response(Parsed_args args, char* buffer) {
             std::string sender = get_nth_part_of_response(buffer_string, 1);
             std::string subject = get_nth_part_of_response(buffer_string, 2);
             std::string body = get_nth_part_of_response(buffer_string, 3);
+
+            subject = escape_characters(subject);
+            body = escape_characters(body);
 
             std::cout << "SUCCESS:\n\n" << "From: " << sender << '\n';
             std::cout << "Subject: " << subject << "\n\n";
