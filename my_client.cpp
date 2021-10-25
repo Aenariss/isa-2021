@@ -90,10 +90,12 @@ std::string escape_characters(std::string message) {
                 if (message[i+1] == 'n') {
                     message = message.substr(0, i) + '\n' + message.substr(i+2, message.length()-i);
                 }
+                if (message[i+1] == 't') {
+                    message = message.substr(0, i) + '\t' + message.substr(i+2, message.length()-i);
+                }
             }
         }
     }
-    print(message)
     return message;
 }
 
