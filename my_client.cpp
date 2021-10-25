@@ -1,5 +1,6 @@
 // ISA 2021 Projekt - Reverse-engineering neznámeho protokolu 
 // Autor: Vojtech Fiala
+// TODO: vymyslet novy zpusob parsovani odpovedi (esccapnute uvozovky)
 
 #include <iostream>
 #include <tuple>
@@ -45,28 +46,11 @@ bool is_number(std::string string) {
     return true;
 }
 
-/* Pomocna struktura pro ukladani dat zpravy typu "send" */
-struct Send_cmds {
-    char* recipient;
-    char* subject;
-    char* body;
-};
-
-/* Funkce pro naplneni pomocne struktury pro zpracovani prikazu "send" */
-Send_cmds Send_cmd(int index, char **args) {
-    return Send_cmds{args[index+1], args[index+2], args[index+3]};
-}
-
-/* Funkce pouzivana pro nacteni uzivatelskych dat (jmeno a heslo) */
-std::tuple<char*, char*> get_user_data(int index, char **args) {
-    return std::make_tuple(args[index+1], args[index+2]);
-}
-
 /* Pomocna struktura na zpracovavani argumentu - obsahuje vsechny mozne argumenty */
 struct Parsed_args {
-    char *user_name, *user_password, *recipient, *subject, *body, *id;
+    std::string user_name, user_password, recipient, subject, body, id;
     bool reg, list, send, fetch, logout, login;
-    char *addr, *port;
+    std::string addr, port;
 };
 
 /* Funkce na vypis adresy a portu, pouzivana v pripade chyby -- ukonci program s chybou */
@@ -93,16 +77,33 @@ std::string escape_characters(std::string message) {
                 if (message[i+1] == 't') {
                     message = message.substr(0, i) + '\t' + message.substr(i+2, message.length()-i);
                 }
+                if (message[i+1] == '\"') {
+                    message = message.substr(0, i) + '\"' + message.substr(i+2, message.length()-i);
+                }
             }
         }
     }
     return message;
 }
 
+std::string escape_args(std::string message) {
+    std::string new_message = "";
+    for (unsigned int i = 0; i < message.length(); i++) {
+        if (message[i] == '\"') {
+            new_message += "\\\"";
+        }
+        else {
+            new_message += message[i];
+        }
+    }
+
+    return new_message;
+}
+
 /* Funkce pro zpracovani argumentu */
 Parsed_args parse_args(int argc, char *argv[]) {
-    char *user_name, *user_password, *recipient, *subject, *body, *id;
-    user_name = user_password = recipient = subject = body = id = nullptr;
+    std::string user_name, user_password, recipient, subject, body, id;
+    user_name = user_password = recipient = subject = body = id = "";
     bool reg, list, send, fetch, logout, login;
     reg = list = send = fetch = logout = login = false;
     std::string addr, port;
@@ -117,25 +118,35 @@ Parsed_args parse_args(int argc, char *argv[]) {
     std::smatch result_match;
     bool found = false;
 
+    // Vytvorim si vektor stringu pro usnadneni jejich escapu
+    std::vector<std::string> vec;
     for (int i = 1; i < argc; i++) {
+        std::string tmp_arg(argv[i]);
 
-        std::string str(argv[i]);
-        if (!std::regex_search(str, result_match, check_reg)) {
-            if (std::regex_search(str, result_match, switch_reg)) {
-                size_t length = strlen(argv[i]);
+        // Escapuju kazdy argument
+        tmp_arg = escape_args(tmp_arg);
+        vec.push_back(tmp_arg);
+    }
+
+    unsigned int limit = (unsigned int) argc-1;
+    for (unsigned int i = 0; i < vec.size(); i++) {
+
+        if (!std::regex_search(vec[i], result_match, check_reg)) {
+            if (std::regex_search(vec[i], result_match, switch_reg)) {
+                size_t length = vec[i].length();
                 for (size_t k = 1; k < length; k++) {
 
-                    if (argv[i][k] == 'h') {
+                    if (vec[i][k] == 'h') {
                         print_help();
                         exit(0);
                     }
-                    else if (argv[i][k] == 'p') {
-                        if (i+1 > argc-1) {
+                    else if (vec[i][k] == 'p') {
+                        if (i+1 > limit-1) {
                             std::cerr << "client: the \"-p\" option needs 1 argument, but 0 provided\n";
                             exit(1);
                         }
                         else {
-                            port = argv[i+1];
+                            port = vec[i+1];
                             found = true;
                             // Port a jeho kontrola maji prednost pred vsim ostatnim, podle ref. reseni
                             if(!(is_number(port))) {
@@ -144,18 +155,18 @@ Parsed_args parse_args(int argc, char *argv[]) {
                             }
                         }
                     }
-                    else if (argv[i][k] == 'a') {
-                        if (i+1 > argc-1) {
+                    else if (vec[i][k] == 'a') {
+                        if (i+1 > limit-1) {
                             std::cerr << "client: the \"-a\" option needs 1 argument, but 0 provided\n";
                             exit(1);
                         }
                         else {
-                            addr = argv[i+1];
+                            addr = vec[i+1];
                             found = true;
                         }
                     }
                     else {
-                        std::cerr << "client: unknown switch: -" << argv[i][k] << '\n';
+                        std::cerr << "client: unknown switch: -" << vec[i][k] << '\n';
                         exit(1); 
                     }
                 }
@@ -174,31 +185,33 @@ Parsed_args parse_args(int argc, char *argv[]) {
             addr = "localhost";
 
 
-        if (!strcmp(argv[i], "register")) {
-            if (i+2 > argc-1 || i+2 < argc-1 || port.empty() || addr.empty()) {
+        if (!strcmp(vec[i].c_str(), "register")) {
+            if (i+2 > limit-1 || i+2 < limit-1 || port.empty() || addr.empty()) {
                 std::cerr << "register <username> <password>\n";
                 exit(1);
             }
             else {
-                std::tie(user_name, user_password) = get_user_data(i, argv);
+                user_name = vec[i+1];
+                user_password = vec[i+2];
                 reg = true;
                 break;
             }
         }
 
-        else if (!strcmp(argv[i], "login")) {
-            if (i+2 > argc-1 || i+2 < argc-1 || port.empty() || addr.empty()) {
+        else if (!strcmp(vec[i].c_str(), "login")) {
+            if (i+2 > limit-1 || i+2 < limit-1 || port.empty() || addr.empty()) {
                 std::cerr << "login <username> <password>\n";
                 exit(1);
             }
             else {
-                std::tie(user_name, user_password) = get_user_data(i, argv);
+                user_name = vec[i+1];
+                user_password = vec[i+2];
                 login = true;
                 break;
             }
         }
-        else if (!strcmp(argv[i], "list")) {
-            if (i < argc-1 || port.empty() || addr.empty()) {
+        else if (!strcmp(vec[i].c_str(), "list")) {
+            if (i < limit-1 || port.empty() || addr.empty()) {
                 std::cerr << "list\n";
                 exit(1);
             }
@@ -206,35 +219,34 @@ Parsed_args parse_args(int argc, char *argv[]) {
             break;
         }
         
-        else if (!strcmp(argv[i], "send")) {
-            if (i+3 > argc-1 || port.empty() || addr.empty()) {
+        else if (!strcmp(vec[i].c_str(), "send")) {
+            if (i+3 > limit-1 || port.empty() || addr.empty()) {
                 std::cerr << "send <recipient> <subject> <body>\n";
                 exit(1);
             }
             else {
-                Send_cmds ret = Send_cmd(i, argv);
-                recipient = ret.recipient;
-                subject = ret.subject;
-                body = ret.body;
+                recipient = vec[i+1];
+                subject = vec[i+2];
+                body = vec[i+3];
                 send = true;
                 break;
             }
         }
 
-        else if (!strcmp(argv[i], "fetch")) {
-            if (i+1 > argc-1 || port.empty() || addr.empty()) {
+        else if (!strcmp(vec[i].c_str(), "fetch")) {
+            if (i+1 > limit-1 || port.empty() || addr.empty()) {
                 std::cerr << "fetch <id>\n";
                 exit(1);
             }
             else {
-                id = argv[i+1];
+                id = (char*) vec[i+1].c_str();
                 fetch = true;
                 break;
             }
         }
 
-        else if (!strcmp(argv[i], "logout")) {
-            if (i < argc-1 || port.empty() || addr.empty()) {
+        else if (!strcmp(vec[i].c_str(), "logout")) {
+            if (i < limit-1 || port.empty() || addr.empty()) {
                 std::cerr << "logout\n";
                 exit(1);
             }
@@ -244,36 +256,35 @@ Parsed_args parse_args(int argc, char *argv[]) {
             }
         }
 
-        else if (!strcmp(argv[i], "-a") || !strcmp(argv[i], "--address")) {
-            if (i+1 > argc-1) {
+        else if (!strcmp(vec[i].c_str(), "-a") || !strcmp(vec[i].c_str(), "--address")) {
+            if (i+1 > limit-1) {
                 std::cerr << "client: the \"-a\" option needs 1 argument, but 0 provided\n";
                 exit(1);
             }
             else {
-                addr = argv[i+1];
+                addr = vec[i+1];
                 i++;
             }
         }
         
-        else if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "--port")) {
-            if (i+1 > argc-1) {
+        else if (!strcmp(vec[i].c_str(), "-p") || !strcmp(vec[i].c_str(), "--port")) {
+            if (i+1 > limit-1) {
                 std::cerr << "client: the \"-p\" option needs 1 argument, but 0 provided\n";
                 exit(1);
             }
             else {
-                port = argv[i+1];
+                port = vec[i+1];
                 i++;
             }
         }
 
-        else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
+        else if (!strcmp(vec[i].c_str(), "-h") || !strcmp(vec[i].c_str(), "--help")) {
             print_help();
             exit(1);
         }
 
         else {
             std::cerr << "unknown command\n";
-            std::cerr << argv[i] << '\n';
             exit(1);
         }
     }
@@ -315,7 +326,7 @@ std::string create_login_register_message(Parsed_args args, std::string msg) {
     }
 
     // U prikazu login a register se pouziva base64 kodovani pro heslo 
-    std::vector<unsigned char> password(args.user_password, args.user_password + strlen(args.user_password));
+    std::vector<unsigned char> password(args.user_password.c_str(), args.user_password.c_str() + args.user_password.length());
     std::string encoded_password = base64_encode(&password[0], password.size());
     msg = msg + args.user_name + "\" \"" +  encoded_password + "\"";
     return msg;
@@ -395,6 +406,11 @@ std::string get_nth_part_of_response(std::string response, int part) {
     begin = end = -1;
     for (unsigned int i = 0; i < response.length(); i++) {
         if (response[i] == 34) {
+            if (i >= 1) {
+                if (response[i-1] == '\\') {
+                    continue;
+                }
+            }
             counter++;
             if (begin != -1) {
                 end = i;
@@ -438,22 +454,20 @@ void print_list_messages(std::string buffer_string) {
     }
     for (std::string message : list_of_strings) {
         std::cout << message[0] << ':' << '\n';
-        std::cout << "  From: " <<  get_nth_part_of_response(message, 1) << '\n';
-        std::cout << "  Subject: " << get_nth_part_of_response(message, 2) << '\n';
+        std::cout << "  From: " <<  escape_characters(get_nth_part_of_response(message, 1)) << '\n';
+        std::cout << "  Subject: " << escape_characters(get_nth_part_of_response(message, 2)) << '\n';
     }
 
 
 }
 
 /* Vypsani odpovedi na ostatni prikazy */
-void print_response(Parsed_args args, char* buffer) {
+void print_response(Parsed_args args, std::string buffer) {
     std::regex error_reg("^\\(err");
     std::regex ok_reg("^\\(ok+");
     std::smatch result_match;
-    std::string buffer_string(buffer);
 
-
-    if (std::regex_search(buffer_string, result_match, ok_reg)) {
+    if (std::regex_search(buffer, result_match, ok_reg)) {
         /* 
          * login: User logged in
          * register: registered user <user>
@@ -465,33 +479,30 @@ void print_response(Parsed_args args, char* buffer) {
 
         // User logged in + vytvori login-token
         if (args.login) {
-            std::string body = get_nth_part_of_response(buffer_string, 1);
+            std::string body = get_nth_part_of_response(buffer, 1);
             std::cout << "SUCCESS: " << body << '\n';
-            std::string token = get_nth_part_of_response(buffer_string, 2);
+            std::string token = get_nth_part_of_response(buffer, 2);
             std::ofstream login_token("login-token");
             login_token << "\"" << token << "\"";
             login_token.close();
         }   // registered user <user>
         else if (args.reg) {
-            std::string body = get_nth_part_of_response(buffer_string, 1);
+            std::string body = escape_characters(get_nth_part_of_response(buffer, 1));
             std::cout << "SUCCESS: " << body << '\n';
         }   // SUCCESS: zpravy
         else if (args.list) {
             std::cout << "SUCCESS:\n";
-            print_list_messages(buffer_string);
+            print_list_messages(buffer);
 
         }   // message sent
         else if (args.send) {
-            std::string body = get_nth_part_of_response(buffer_string, 1);
+            std::string body = get_nth_part_of_response(buffer, 1);
             std::cout << "SUCCESS: " << body << '\n';
         }
         else if (args.fetch) {
-            std::string sender = get_nth_part_of_response(buffer_string, 1);
-            std::string subject = get_nth_part_of_response(buffer_string, 2);
-            std::string body = get_nth_part_of_response(buffer_string, 3);
-
-            subject = escape_characters(subject);
-            body = escape_characters(body);
+            std::string sender = escape_characters(get_nth_part_of_response(buffer, 1));
+            std::string subject = escape_characters(get_nth_part_of_response(buffer, 2));
+            std::string body = escape_characters(get_nth_part_of_response(buffer, 3));
 
             std::cout << "SUCCESS:\n\n" << "From: " << sender << '\n';
             std::cout << "Subject: " << subject << "\n\n";
@@ -502,12 +513,12 @@ void print_response(Parsed_args args, char* buffer) {
                 std::cout << "Internal client error when logging out!\n";
                 exit(1);
             }
-            std::string body = get_nth_part_of_response(buffer_string, 1);
+            std::string body = get_nth_part_of_response(buffer, 1);
             std::cout << "SUCCESS: " << body << '\n';
         }
 
     }
-    else if (std::regex_search(buffer_string, result_match, error_reg)) {
+    else if (std::regex_search(buffer, result_match, error_reg)) {
         /* Vypada to, ze vsechno jsou 1 radkove errory a nemusim rozlisovat, odkud prisli
          * login: incorrect password, unknown user
          * register: user already registered
@@ -517,7 +528,7 @@ void print_response(Parsed_args args, char* buffer) {
          * logout: Not logged in
         */
 
-        std::string body = get_nth_part_of_response(buffer_string, 1);
+        std::string body = get_nth_part_of_response(buffer, 1);
         std::cerr << "ERROR: " << body << '\n';
     }
     
@@ -552,7 +563,7 @@ void send_and_receive(Parsed_args args) {
     hints.ai_protocol = 0;           // Protokol pro socktype
 
     // Konverze adresy (i pripadneho hostname) na neco, s cim muzu pracovat
-    s = getaddrinfo(args.addr, args.port, &hints, &result);
+    s = getaddrinfo(args.addr.c_str(), args.port.c_str(), &hints, &result);
     if (s != 0) {
         std::cerr << "Error with address resolution \n";
         exit(1);
@@ -586,26 +597,28 @@ void send_and_receive(Parsed_args args) {
     std::string received_msg = "";
     int valread = -1;
 
-    // Pokud by byla vysledna zprava moc velka, musim resit i to, ze ji prectu celou
+    // Pokud by byla serverova odpoved moc velka na 1 paket, musim resit i to, ze ji prectu celou
     do {
         valread = read(sock, buffer, 2048);
-        std::string tmp_buf (buffer);
-        received_msg += tmp_buf;
         // Server uz nema co poslat, tak muzu skoncit
         if (valread == 0)
             break;
-         // Jestlize se nepovedlo zpracovat odpoved, doslo k nejake chybe po ceste paketu
+        // Jestlize se nepovedlo zpracovat odpoved, doslo k nejake chybe po ceste paketu
         else if (valread == -1) {
             std::cerr << "Unknown error during packet reading\n";
             exit(1);
         }
+
+        std::string tmp_buf (buffer);
+        // Po ceste se na paket nalepi neporadek, tak ho musim useknout na ocekavanou hodnotu
+        received_msg += tmp_buf.substr(0, valread);
     } while (valread > 0);
 
     // Jestlize k chybe nedoslo, muzu uvolnit pamet, vypsat odpoved serveru a skoncit
     close(sock);
     freeaddrinfo(result);
 
-    print_response(args, (char*) received_msg.c_str());
+    print_response(args, received_msg);
 }
 
 int main(int argc, char **argv) {
