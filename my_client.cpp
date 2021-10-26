@@ -13,6 +13,7 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <stdlib.h>
 #include "base64.h"
 
 #define print(x) (std::cout << x << '\n');  // debug makro
@@ -61,6 +62,7 @@ void print_error(Parsed_args args) {
 
 /* Funkce pro escapovani nekterych charakteru (viz referencni klient) */
 std::string escape_characters(std::string message) {
+    std::string new_message = "";
     for (unsigned int i = 0; i < message.length(); i++) {
         // Jestlize je nejaky charakter "\", musim zkontrolovat chrakter hned za nim
         if (message[i] == 92) {
@@ -70,19 +72,25 @@ std::string escape_characters(std::string message) {
                 exit(1);
             }
             else {
-                if (message[i+1] == 'n') {
-                    message = message.substr(0, i) + '\n' + message.substr(i+2, message.length()-i);
-                }
-                if (message[i+1] == 't') {
-                    message = message.substr(0, i) + '\t' + message.substr(i+2, message.length()-i);
-                }
                 if (message[i+1] == '\"') {
-                    message = message.substr(0, i) + '\"' + message.substr(i+2, message.length()-i);
+                    new_message += '\"';
+                    i++;
+                }
+                else if (message[i+1] == 92) {
+                    new_message += '\\';
+                    i++;
+                }
+                else if (message[i+1] == 'n') {
+                    new_message += '\n';
+                    i++;
                 }
             }
         }
+        else {
+            new_message += message[i];
+        }
     }
-    return message;
+    return new_message;
 }
 
 std::string escape_args(std::string message) {
@@ -90,6 +98,9 @@ std::string escape_args(std::string message) {
     for (unsigned int i = 0; i < message.length(); i++) {
         if (message[i] == '\"') {
             new_message += "\\\"";
+        }
+        else if (message[i] == '\\') {
+            new_message += "\\\\";
         }
         else {
             new_message += message[i];
@@ -474,7 +485,15 @@ void print_list_messages(std::string buffer_string) {
         }
     }
     for (std::string message : list_of_strings) {
-        std::cout << message[0] << ':' << '\n';
+        std::string number_part = "";
+        for (unsigned int i = 0; i < message.length(); i++) {
+            if (isdigit(message[i]))
+                number_part += message[i];
+            else
+                break;
+        }
+
+        std::cout << number_part << ':' << '\n';
         std::cout << "  From: " <<  escape_characters(get_nth_part_of_response(message, 1)) << '\n';
         std::cout << "  Subject: " << escape_characters(get_nth_part_of_response(message, 2)) << '\n';
     }
@@ -530,10 +549,12 @@ void print_response(Parsed_args args, std::string buffer) {
             std::cout << body;
         }   // logged out + smaze login-token
         else if (args.logout) {
+
             if (remove("login-token") != 0) {
                 std::cout << "Internal client error when logging out!\n";
                 exit(1);
             }
+
             std::string body = get_nth_part_of_response(buffer, 1);
             std::cout << "SUCCESS: " << body << '\n';
         }
