@@ -464,15 +464,24 @@ void print_list_messages(std::string buffer_string) {
     first_bracket = second_bracket = -1;
     bool flag1, flag2;
     flag1 = flag2 = false;
-    for(unsigned int i = 1; i < buffer_string.length()-1; i++) {
+    for(unsigned int i = 1; i < buffer_string.length()-1; i++) {    // Zacinam od 1, at nectu prvni zavorku na zacatku zpravy
 
-        if (buffer_string[i] == '(') {
+        if (buffer_string[i] == '(' && i < 8) {     // 8 Kvuli tomu, at nectu zavorky ve zprave, ale jen "oteviraci"
             first_bracket = i;
             flag1 = true;
         }
         else if (buffer_string[i] == ')') {
-            second_bracket = i;
-            flag2 = true;
+            if (i > 1) {
+                // Kontrola, ze zavorka je opravdu konec zpravy a ne soucast textu
+                if (buffer_string[i-1] == '\"' && buffer_string[i-2] != '\\') {
+                    second_bracket = i;
+                    flag2 = true;
+                }
+            }
+            else {
+                second_bracket = i;
+                flag2 = true;
+            }
         }
 
         if (flag1 && flag2) {
@@ -492,7 +501,6 @@ void print_list_messages(std::string buffer_string) {
             else
                 break;
         }
-
         std::cout << number_part << ':' << '\n';
         std::cout << "  From: " <<  escape_characters(get_nth_part_of_response(message, 1)) << '\n';
         std::cout << "  Subject: " << escape_characters(get_nth_part_of_response(message, 2)) << '\n';
