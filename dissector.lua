@@ -315,6 +315,7 @@ function dissect(max_length, buffer, pinfo, tree)
             command_errors(my_string, max_length, subtree, buffer, "already registered", "register")    -- register
             command_errors(my_string, max_length, subtree, buffer, "message id not found", "fetch")     -- fetch
             command_errors(my_string, max_length, subtree, buffer, "unknown recipient", "send")         -- send
+            command_errors(my_string, max_length, subtree, buffer, "incorrect login token", "logout")  -- logout
         end
 
     -- Nepovedlo se priradit zadny odpovidajici typ, cemuz odpovida jedine, ze zprava byla prilis dlouha a toto je jedna z jejiz casti

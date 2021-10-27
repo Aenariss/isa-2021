@@ -464,11 +464,28 @@ void print_list_messages(std::string buffer_string) {
     first_bracket = second_bracket = -1;
     bool flag1, flag2;
     flag1 = flag2 = false;
+    bool flag_begin = true;
     for(unsigned int i = 1; i < buffer_string.length()-1; i++) {    // Zacinam od 1, at nectu prvni zavorku na zacatku zpravy
+
 
         if (buffer_string[i] == '(' && i < 8) {     // 8 Kvuli tomu, at nectu zavorky ve zprave, ale jen "oteviraci"
             first_bracket = i;
             flag1 = true;
+            flag_begin = false;
+        }
+        else if (buffer_string[i] == '(' && !flag_begin) {
+            // Kontrola, ze zavorka je opravdu zacatek a ne soucast textu
+            if (i > 3) {
+                if (buffer_string[i-1] == ' ' && buffer_string[i-2] == ')' && buffer_string[i-3] == '\"' && buffer_string[i-4] != '\\') {
+                    first_bracket = i;
+                    flag1 = true;
+                }
+            }
+            // Else by nemel nikdy nastat
+            else {
+                first_bracket = i;
+                flag1 = true;
+            }
         }
         else if (buffer_string[i] == ')') {
             if (i > 1) {
@@ -478,6 +495,7 @@ void print_list_messages(std::string buffer_string) {
                     flag2 = true;
                 }
             }
+            // Else by nemel nikdy nastat
             else {
                 second_bracket = i;
                 flag2 = true;
@@ -488,11 +506,12 @@ void print_list_messages(std::string buffer_string) {
             std::string message = buffer_string.substr(first_bracket+1, (second_bracket-first_bracket-1));
             list_of_strings.push_back(message);
             if (message == "") {
-                return;
+                break;
             }
             flag1 = flag2 = false;
         }
     }
+    print(buffer_string)
     for (std::string message : list_of_strings) {
         std::string number_part = "";
         for (unsigned int i = 0; i < message.length(); i++) {
