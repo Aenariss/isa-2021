@@ -46,6 +46,15 @@ bool is_number(std::string string) {
     return true;
 }
 
+bool is_number_or_float(std::string string) {
+    size_t limit = string.length();
+    for (size_t i = 0; i < limit; i++) {
+        if (!(isdigit(string[i])) && string[i] != '.' && string[i] != '-')  // Musim pocitat se zapornyma cislama i s floatama
+            return false;
+    }
+    return true;
+}
+
 /* Pomocna struktura na zpracovavani argumentu - obsahuje vsechny mozne argumenty */
 struct Parsed_args {
     std::string user_name, user_password, recipient, subject, body, id;
@@ -102,6 +111,9 @@ std::string escape_args(std::string message) {
         else if (message[i] == '\\') {
             new_message += "\\\\";
         }
+        else if (message[i] == '\n') {
+            new_message += "\\n";
+        }
         else {
             new_message += message[i];
         }
@@ -126,7 +138,9 @@ Parsed_args parse_args(int argc, char *argv[]) {
     std::regex switch_reg("^-");
     std::regex check_reg("^--");
     std::smatch result_match;
-    bool found = false;
+    int found = 0;
+    int a_counter = 0;
+    int p_counter = 0;
 
     // Vytvorim si vektor stringu pro usnadneni jejich escapu
     std::vector<std::string> vec;
@@ -153,14 +167,21 @@ Parsed_args parse_args(int argc, char *argv[]) {
                     }
 
                     else if (vec[i][k] == 'p') {
-                        if (i+1 > limit-1) {
+                        if (i+1 >= limit) {
                             std::cerr << "client: the \"-p\" option needs 1 argument, but 0 provided\n";
                             exit(1);
                         }
                         else {
+                            p_counter++;
+                            // Kontrola, jestli nebyl v ramci multiargumentu zadany nejaky swtich vicekrat
+                            if (p_counter > 1) {
+                                std::cerr << "client: only one instance of one option from (-p --port) is allowed\n";
+                                exit(1);
+                            }
+                            found++;
                             if (count == 0) {
                                 port = vec[i+1];
-                                found = true;
+                                count++;
                                 // Port a jeho kontrola maji prednost pred vsim ostatnim, podle ref. reseni
                                 if(!(is_number(port))) {
                                     std::cerr << "Port number is not a string\n";
@@ -168,12 +189,11 @@ Parsed_args parse_args(int argc, char *argv[]) {
                                 }
                             }
                             else {
-                                if (i+2 > limit-1) {
+                                if (i+2 >= limit) {
                                     std::cerr << "client: the \"-p\" option needs 1 argument, but 0 provided\n";
                                     exit(1);
                                 }
                                 port = vec[i+2];
-                                found = true;
                                 // Port a jeho kontrola maji prednost pred vsim ostatnim, podle ref. reseni
                                 if(!(is_number(port))) {
                                     std::cerr << "Port number is not a string\n";
@@ -183,14 +203,28 @@ Parsed_args parse_args(int argc, char *argv[]) {
                         }
                     }
                     else if (vec[i][k] == 'a') {
-                        count++;
-                        if (i+1 > limit-1) {
+                        if (i+1 >= limit) {
                             std::cerr << "client: the \"-a\" option needs 1 argument, but 0 provided\n";
                             exit(1);
                         }
                         else {
-                            addr = vec[i+1];
-                            found = true;
+                            a_counter++;
+                            if (a_counter > 1) {
+                                std::cerr << "client: only one instance of one option from (-a --address) is allowed\n";
+                                exit(1);
+                            }
+                            found++;
+                            if (count == 0) {
+                                addr = vec[i+1];
+                                count++;
+                            }
+                            else {
+                                if (i+2 >= limit) {
+                                    std::cerr << "client: the \"-a\" option needs 1 argument, but 0 provided\n";
+                                    exit(1);
+                                }
+                                addr = vec[i+2];
+                            }
                         }
                     }
                     else {
@@ -200,18 +234,31 @@ Parsed_args parse_args(int argc, char *argv[]) {
                 }
             }
         }
-        // Jestlize jsem nasel port nebo adresu uz pri multi-prepinaci, musim se posunout o 2
-        // 1 za zpracovany multiprepinac, 1 za zpracovany argument
-        if ((port.empty() || addr.empty()) && (found)) {
-            i+=2;
+        // Kontrola, jestlize argument zacinal 2x pomlckou, musi to byt jeden z nasledujicich 3
+        else {
+            if (strcmp(vec[i].c_str(), "--port") && strcmp(vec[i].c_str(), "--address") && strcmp(vec[i].c_str(), "--help")) {
+                std::cerr << "client: unknown switch: " << vec[i] << '\n';
+                exit(1); 
+            }
         }
-        
-        // Jinak prirazuju defaultni hodnoty
-        if (port.empty())
-            port = "32323";
-        if (addr.empty())
-            addr = "localhost";
+        // Musi se navysit index posunuti defaultne, at se nachazi na dalsim argumentu
+        if (found > 0)
+            found++;
+        i += found;
 
+        // Protoze se navysoval index kvuli prepinacum, je potreba jej zkontrolovat
+        if (i >= limit) {
+            std::cerr << "client: expects <command> [<args>] ... on the command line, given 0 arguments\n";
+            exit(1);
+        }
+
+        // Kontrola, ze po posunuti neni dalsi na rade kratky prepinac -> Zpracovava se pouze v bloku vyse, tak se tam presunu
+        if (std::regex_search(vec[i], result_match, switch_reg) && found) {
+            found = 0;
+            i--;    // Musim odecist 'i', protoze v dalsim cyklu dojde k jeho opetovnemu navyseni, tak at se nic nepreskoci
+            continue;
+        }
+        found = 0;
 
         if (!strcmp(vec[i].c_str(), "register")) {
             if (i+2 > limit-1 || i+2 < limit-1) {
@@ -284,9 +331,15 @@ Parsed_args parse_args(int argc, char *argv[]) {
             }
         }
 
-        else if (!strcmp(vec[i].c_str(), "-a") || !strcmp(vec[i].c_str(), "--address")) {
+        else if (!strcmp(vec[i].c_str(), "--address")) {
+            // Znovu opet kontrola, ze se argument nevyskytl vicekrat
+            a_counter++;
+            if (a_counter > 1) {
+                std::cerr << "client: only one instance of one option from (-a --address) is allowed\n";
+                exit(1);
+            }
             if (i+1 > limit-1) {
-                std::cerr << "client: the \"-a\" option needs 1 argument, but 0 provided\n";
+                std::cerr << "client: the \"--address\" option needs 1 argument, but 0 provided\n";
                 exit(1);
             }
             else {
@@ -295,9 +348,14 @@ Parsed_args parse_args(int argc, char *argv[]) {
             }
         }
         
-        else if (!strcmp(vec[i].c_str(), "-p") || !strcmp(vec[i].c_str(), "--port")) {
+        else if (!strcmp(vec[i].c_str(), "--port")) {
+            p_counter++;
+            if (p_counter > 1) {
+                std::cerr << "client: only one instance of one option from (-p --port) is allowed\n";
+                exit(1);
+            }
             if (i+1 > limit-1) {
-                std::cerr << "client: the \"-p\" option needs 1 argument, but 0 provided\n";
+                std::cerr << "client: the \"--port\" option needs 1 argument, but 0 provided\n";
                 exit(1);
             }
             else {
@@ -310,7 +368,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
             }
         }
 
-        else if (!strcmp(vec[i].c_str(), "-h") || !strcmp(vec[i].c_str(), "--help")) {
+        else if (!strcmp(vec[i].c_str(), "--help")) {
             print_help();
             exit(1);
         }
@@ -320,6 +378,12 @@ Parsed_args parse_args(int argc, char *argv[]) {
             exit(1);
         }
     }
+
+    // Defaultni hodnoty
+    if (port.empty())
+        port = "32323";
+    if (addr.empty())
+        addr = "localhost";
 
     if (!reg && !list && !send && !fetch && !logout && !login) {
         std::cerr << "client: expects <command> [<args>] ... on the command line, given 0 arguments\n";
@@ -331,7 +395,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
                        reg, list, send, fetch, logout, login, (char*) addr.c_str(), (char*) port.c_str()};
 }
 
-// https://stackoverflow.com/questions/2602013/read-whole-ascii-file-into-c-stdstring
+// https://stackoverflow.com/a/2602258
 /* Funkce pro nacteni user tokenu ze souboru */
 std::string read_user_token() {
 
@@ -374,6 +438,10 @@ std::string create_send_message(Parsed_args args, std::string msg) {
 /* Vytvoreni zpravy pro prikaz "fetch" */
 std::string create_fetch_message(Parsed_args args, std::string msg) {
     std::string user_token = read_user_token();
+    if (!is_number_or_float(args.id)) {
+        std::cerr << "ERROR: id " << args.id << " is not a number\n";
+        exit(1);
+    }
     msg = msg +  "fetch " + user_token + " " + args.id;
     return msg;
 }
@@ -511,7 +579,6 @@ void print_list_messages(std::string buffer_string) {
             flag1 = flag2 = false;
         }
     }
-    print(buffer_string)
     for (std::string message : list_of_strings) {
         std::string number_part = "";
         for (unsigned int i = 0; i < message.length(); i++) {
@@ -616,6 +683,28 @@ void check_args(Parsed_args args) {
 }
 
 // https://man7.org/linux/man-pages/man3/getaddrinfo.3.html
+// Nize se nachazi text nutny kvuli vyuziti kodu z dane stranky
+/* 
+Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+Since the Linux kernel and libraries are constantly changing, this
+manual page may be incorrect or out-of-date.  The author(s) assume no
+responsibility for errors or omissions, or for damages resulting from
+the use of the information contained herein.  The author(s) may not
+have taken the same level of care in the production of this manual,
+which is licensed free of charge, as they might when working
+professionally.
+
+Formatted or processed versions of this manual, if unaccompanied by
+the source, must acknowledge the copyright and authors of this work.
+*/
 /*
  * Hlavni ridici funkce, ktera posila zpravy na server a zpracovava odpovedi
 */
