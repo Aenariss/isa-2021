@@ -22,38 +22,38 @@ function main_compare() {
 }
 
 function compare_1_args() {
-    $home/my_client "$1" &> tmp_out
-    $home/client "$1" &> tmp_out_ref
+    $home/client "$1" &> tmp_out
+    $home/origo_client "$1" &> tmp_out_ref
     main_compare
 }
 
 function compare_2_args() {
-    $home/my_client "$1" "$2" &> tmp_out
-    $home/client "$1" "$2" &> tmp_out_ref
+    $home/client "$1" "$2" &> tmp_out
+    $home/origo_client "$1" "$2" &> tmp_out_ref
     main_compare
 }
 
 function compare_3_args() {
-    $home/my_client "$1" "$2" "$3" &> tmp_out
-    $home/client "$1" "$2" "$3" &> tmp_out_ref
+    $home/client "$1" "$2" "$3" &> tmp_out
+    $home/origo_client "$1" "$2" "$3" &> tmp_out_ref
     main_compare
 }
 
 function compare_4_args() {
-    $home/my_client "$1" "$2" "$3" "$4" &> tmp_out
-    $home/client "$1" "$2" "$3" "$4" &> tmp_out_ref
+    $home/client "$1" "$2" "$3" "$4" &> tmp_out
+    $home/origo_client "$1" "$2" "$3" "$4" &> tmp_out_ref
     main_compare
 }
 
 function compare_5_args() {
-    $home/my_client "$1" "$2" "$3" "$4" "$5" &> tmp_out
-    $home/client "$1" "$2" "$3" "$4" "$5" &> tmp_out_ref
+    $home/client "$1" "$2" "$3" "$4" "$5" &> tmp_out
+    $home/origo_client "$1" "$2" "$3" "$4" "$5" &> tmp_out_ref
     main_compare
 }
 
 function compare_6_args() {
-    $home/my_client "$1" "$2" "$3" "$4" "$5" "$6" &> tmp_out
-    $home/client "$1" "$2" "$3" "$4" "$5" "$6" &> tmp_out_ref
+    $home/client "$1" "$2" "$3" "$4" "$5" "$6" &> tmp_out
+    $home/origo_client "$1" "$2" "$3" "$4" "$5" "$6" &> tmp_out_ref
     main_compare
 }
 
@@ -73,6 +73,7 @@ compare_5_args "-p" "32323" "--address" "--address" "127.0.0.1"
 compare_5_args "-p" "32323" "--port" "32323" "127.0.0.1"
 compare_5_args "-pp" "32323" "--port" "32323" "127.0.0.1"
 compare_5_args "-p" "32323" "-pa" "32323" "127.0.0.1"
+compare_5_args "-pa" "32323" "-a" "127.0.0.1" "list"
 compare_4_args "-a" "127.0.0.1" "-p" "32323"
 compare_3_args "-ap" "127.0.0.1" "32323"
 compare_3_args "-pa" "32323" "127.0.0.1"

@@ -188,7 +188,28 @@ local function get_char_index(buffer, n, needle)
     return first_quote, second_quote
 end
 
--- Funkce na nalezeni casti stringu obsahujici cislo
+-- Funkce na nalezeni casti stringu obsahujici cislo ktere muze byt i float
+local function get_number_or_float(buffer)
+    local buff_len = buffer:len()
+    local my_string = tostring(buffer(0, buff_len))
+    local my_string = Struct.fromhex(my_string)
+    local flag = 0
+    local n_begin = -1
+    local n_end = -1
+    for i=1,buff_len do                                     -- Iteruju skrz cely buffer
+        local char = my_string:sub(i,i)
+        local byte_compare = string.byte(char)              -- Zkonvertuju si nacteny charakter na ascii hodnotu
+        if ((byte_compare >= 48 and byte_compare <= 57) or char == '.' or char == '-') then -- Jestlize ascii hodnota odpovida cislu (a nebo - a .), asi to bude cislo
+            if (n_begin ~= -1) then n_end = i end           -- Jestlize uz jsem predtim nejake cislo nasel, muzu posunout ukoncovaci pozici
+            if (flag == 0) then n_begin = i flag = 1 end    -- Prvni nalezeno cislo = zacatek cele ciselne casti
+        end
+    end
+    if n_end == -1 then n_end = n_begin end                 -- Jestlize jsem nenasel konec, znamena to nejspis, ze bylo cislo jen 1 a proto nastavim konec na zacatek
+    return n_begin, n_end
+
+end
+
+-- Funkce na nalezeni casti stringu obsahujici cislo ktere muze byt i float
 local function get_number(buffer)
     local buff_len = buffer:len()
     local my_string = tostring(buffer(0, buff_len))
@@ -199,7 +220,7 @@ local function get_number(buffer)
     for i=1,buff_len do                                     -- Iteruju skrz cely buffer
         local char = my_string:sub(i,i)
         local byte_compare = string.byte(char)              -- Zkonvertuju si nacteny charakter na ascii hodnotu
-        if ((byte_compare >= 48 and byte_compare <= 57) or byte_compare == 45 or byte_compare == 46) then -- Jestlize ascii hodnota odpovida cislu (a nebo - a .), asi to bude cislo
+        if (byte_compare >= 48 and byte_compare <= 57) then -- Jestlize ascii hodnota odpovida cislu (a nebo - a .), asi to bude cislo
             if (n_begin ~= -1) then n_end = i end           -- Jestlize uz jsem predtim nejake cislo nasel, muzu posunout ukoncovaci pozici
             if (flag == 0) then n_begin = i flag = 1 end    -- Prvni nalezeno cislo = zacatek cele ciselne casti
         end
@@ -208,6 +229,7 @@ local function get_number(buffer)
     return n_begin, n_end
 
 end
+
 
 -- Funkce na pridani casti mezi uvozovkami do stromove struktury, ktera se vypisuje ve wiresharku
 function add_quote_to_tree(subtree, buffer, max_length, n, field)
@@ -218,9 +240,8 @@ end
 
 -- Funkce pro pridani cisel do stromove struktury
 function add_number_to_tree(subtree, buffer, max_length, field, prev_quote)
-    local begin_n, end_n = get_number(buffer(prev_quote, max_length-prev_quote))
-    if end_n == begin_n then end_n = end_n + 1 end
-    subtree:add(field, buffer(prev_quote+begin_n-1, end_n-begin_n))
+    local begin_n, end_n = get_number_or_float(buffer(prev_quote, max_length-prev_quote))
+    subtree:add(field, buffer(prev_quote+begin_n-1, end_n-begin_n+1))
 end
 
 -- Funkce pro zpracovani error messages ve wiresharku
