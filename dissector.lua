@@ -62,19 +62,22 @@ local function get_char_index(buffer, n, needle)
     local i = 1
     local k = 0
     local flag = 0
+    local begin_flag = 0
     local remains_to_read = buff_len
     while k <= buff_len do  -- Ctu, dokud neprectu cely buffer
         -- Prvotni urceni cteciho bloku
         if remains_to_read >= block_size and flag == 0 then -- Pokud zbyva precist  vic nez je velikost bloku, zacinam ctenim prvnich 36 znaku
-            my_string = tostring(buffer(0, block_size))
+            my_string = tostring(buffer(k, block_size))
             my_string = Struct.fromhex(my_string)
             my_string_prev = my_string
             flag = 1
+            begin_flag = 1
         elseif flag == 0 then                               -- Jinak nactu rovnou cely buffer
             my_string = tostring(buffer)
             my_string = Struct.fromhex(my_string)
             my_string_prev = my_string
             flag = 1
+            begin_flag = 1
         end
 
         -- Urcovani aktualniho cteciho bloku
@@ -98,7 +101,7 @@ local function get_char_index(buffer, n, needle)
 
         local char = my_string:sub(i,i)                     -- Charakter na prave ctene pozici v bufferu
         -- Urceni zpracovani zavorek
-        if needle == '(' then                               
+        if needle == '(' then           
             if char == ')' then 
                 if first_quote ~= -1 then                   -- Jestlize uz byla nactena oteviraci ( zavorka, musim zkontrolovat, jestli muzu blok zavrit dalsi
                     if i > 2 then                           -- Za pomoci predchazejicih 2 znaku urcim, jestli se jedna o konec "bloku" a nebo o zavorku v textu
@@ -110,7 +113,17 @@ local function get_char_index(buffer, n, needle)
                                 break
                             end
                         end
-                    else                                    -- Jestlize jsem na zacatku noveho cteciho bloku, musim zkontrolovat blok predchozi
+                    elseif i > 1 then  -- Muzu byt ale i na pomezi
+                        local prev_char = my_string:sub(i-1,i-1)
+                        local prev_prev_char = my_string_prev:sub(block_size,block_size)
+                        if prev_char == '\"' then
+                            if prev_prev_char ~= "\\" then
+                                second_quote = k+1
+                                break
+                            end
+                        end
+                        break
+                    else -- Jestlize jsem na zacatku noveho cteciho bloku, musim zkontrolovat blok predchozi
                         local prev_char = my_string_prev:sub(block_size,block_size)
                         local prev_prev_char = my_string_prev:sub(block_size-1,block_size-1)
                         if prev_char == '\"' then
@@ -122,17 +135,15 @@ local function get_char_index(buffer, n, needle)
                         break
                     end
                 end
-            end
-            if char == '(' then                             -- Jestlize jsem objevil oteviraci zavorku, nemusim ji nijak zvlast resit
+            elseif char == '(' then                             -- Jestlize jsem objevil oteviraci zavorku, nemusim ji nijak zvlast resit
                 counter = counter + 1
                 if counter == n then
                     first_quote = k+1
                 end
             end
-        
         -- Zpracovani jinaciho hledaneho znaku (V mem pripade tady pujde jenom uvozovky - ") na stejnem principu jako vyse
         else 
-            if char == needle then 
+            if char == needle then
                 if i > 1 then
                     local tmp_char = my_string:sub(i-1,i-1) -- U uvozovek staci kontrolovat pouze predchozi znak
                     if tmp_char ~= '\\' then                -- Ten nesmi byt backslash -> Uvozovka neni escapnuta
@@ -146,30 +157,59 @@ local function get_char_index(buffer, n, needle)
                         end
                     end
                 else
-                    local tmp_char = my_string_prev:sub(block_size,block_size)  -- Jestlize byla uvozovka na zacatku noveho bloku, musim kontrolovat predchozi
-                    if tmp_char ~= '\\' then
+                    if begin_flag == 1 then
                         counter = counter + 1
-                        if first_quote ~= -1 then
-                            second_quote = k+1
-                            break
-                        end
                         if counter == limit then
                             first_quote = k+1
+                        end
+                    else
+                        local tmp_char = my_string_prev:sub(block_size,block_size)  -- Jestlize byla uvozovka na zacatku noveho bloku, musim kontrolovat predchozi
+                        if tmp_char ~= '\\' then
+                            counter = counter + 1
+                            if first_quote ~= -1 then
+                                second_quote = k+1
+                                break
+                            end
+                            if counter == limit then
+                                first_quote = k+1
+                            end
                         end
                     end
                 end
             end
         end
+        begin_flag = 0
         if (i == block_size) then i = 0 end -- Jestlize index v aktualnim bloku dosahl velikosti bloku, je potreba ho vynulovat
         i = i + 1                           -- A hned ho zase inkrementovat, protoze stringy v LUA zacinaji z nejakeho duvodu na 1
         k = k + 1                           -- Inkrementuje se i aktualni cteci index v celem bufferu
     end
-    if first_quote == -1 then first_quote = 0 end   -- Jestlize jsem znak nenasel, dam si misto -1 0, at nedochazi k moc velkym chybam
-    if second_quote == -1 then second_quote = 0 end
+    if first_quote == -1 then first_quote = 0 end   -- Jestlize jsem znak nenasel, dam zacatek na pozici 0, at nedochazi k prilisnym problemuim
+    if second_quote == -1 then second_quote = buff_len end  -- Jestlize nebyl nalezen ukoncovaci znak, vezmu cely zbytek zpravy
     return first_quote, second_quote
 end
 
--- Funkce na nalezeni casti stringu obsahujici cislo
+-- Funkce na nalezeni casti stringu obsahujici cislo ktere muze byt i float
+local function get_number_or_float(buffer)
+    local buff_len = buffer:len()
+    local my_string = tostring(buffer(0, buff_len))
+    local my_string = Struct.fromhex(my_string)
+    local flag = 0
+    local n_begin = -1
+    local n_end = -1
+    for i=1,buff_len do                                     -- Iteruju skrz cely buffer
+        local char = my_string:sub(i,i)
+        local byte_compare = string.byte(char)              -- Zkonvertuju si nacteny charakter na ascii hodnotu
+        if ((byte_compare >= 48 and byte_compare <= 57) or char == '.' or char == '-') then -- Jestlize ascii hodnota odpovida cislu (a nebo - a .), asi to bude cislo
+            if (n_begin ~= -1) then n_end = i end           -- Jestlize uz jsem predtim nejake cislo nasel, muzu posunout ukoncovaci pozici
+            if (flag == 0) then n_begin = i flag = 1 end    -- Prvni nalezeno cislo = zacatek cele ciselne casti
+        end
+    end
+    if n_end == -1 then n_end = n_begin end                 -- Jestlize jsem nenasel konec, znamena to nejspis, ze bylo cislo jen 1 a proto nastavim konec na zacatek
+    return n_begin, n_end
+
+end
+
+-- Funkce na nalezeni casti stringu obsahujici cislo ktere muze byt i float
 local function get_number(buffer)
     local buff_len = buffer:len()
     local my_string = tostring(buffer(0, buff_len))
@@ -180,7 +220,7 @@ local function get_number(buffer)
     for i=1,buff_len do                                     -- Iteruju skrz cely buffer
         local char = my_string:sub(i,i)
         local byte_compare = string.byte(char)              -- Zkonvertuju si nacteny charakter na ascii hodnotu
-        if (byte_compare >= 48 and byte_compare <= 57) then -- Jestlize ascii hodnota odpovida cislu, asi to bude cislo
+        if (byte_compare >= 48 and byte_compare <= 57) then -- Jestlize ascii hodnota odpovida cislu (a nebo - a .), asi to bude cislo
             if (n_begin ~= -1) then n_end = i end           -- Jestlize uz jsem predtim nejake cislo nasel, muzu posunout ukoncovaci pozici
             if (flag == 0) then n_begin = i flag = 1 end    -- Prvni nalezeno cislo = zacatek cele ciselne casti
         end
@@ -189,6 +229,7 @@ local function get_number(buffer)
     return n_begin, n_end
 
 end
+
 
 -- Funkce na pridani casti mezi uvozovkami do stromove struktury, ktera se vypisuje ve wiresharku
 function add_quote_to_tree(subtree, buffer, max_length, n, field)
@@ -199,8 +240,7 @@ end
 
 -- Funkce pro pridani cisel do stromove struktury
 function add_number_to_tree(subtree, buffer, max_length, field, prev_quote)
-    local begin_n, end_n = get_number(buffer(prev_quote, max_length-prev_quote))
-    if end_n == begin_n then end_n = end_n + 1 end
+    local begin_n, end_n = get_number_or_float(buffer(prev_quote, max_length-prev_quote))
     subtree:add(field, buffer(prev_quote+begin_n-1, end_n-begin_n+1))
 end
 
@@ -215,7 +255,7 @@ end
 -- Funkce pro zpracovavani jednotlivych odpovedi
 function dissect(max_length, buffer, pinfo, tree)
 
-    pinfo.cols.protocol = isa_protocol.name                                     -- Nastaveni kolonky "Protocol" ve wiresharku na ISA
+    pinfo.cols.protocol = isa_protocol.name     -- Nastaveni kolonky "Protocol" ve wiresharku na ISA
     local subtree = tree:add(isa_protocol, buffer(), "ISA Protocol Payload")    -- Nastaveni nazvu substromu, ve kterem se zobrazuji udaje o ISA paketu
 
     local msg_type
@@ -249,13 +289,14 @@ function dissect(max_length, buffer, pinfo, tree)
                 -- while loop pro vypisovani jednotlivych zprav z list commandu
                 while i < endpoint do   -- Dokud jsem neprecetl cely buffer, tak pracuju
                     local left_bracket, right_bracket = get_char_index(buffer(initial_offset, max_length-7), k, "(")
-                    local response_body = buffer(left_bracket+initial_offset-2, right_bracket-left_bracket)
-                    local my_string = tostring(response_body)
-                    local my_string = Struct.fromhex(my_string)
+                    -- local response_body = buffer(left_bracket+initial_offset-2, right_bracket-left_bracket) -- Pro ucely pripadneho debugovani to tady radsi necham
+                    if (right_bracket == max_length) then return end
                     local first_quote, second_quote = get_char_index(buffer(left_bracket+initial_offset-1, right_bracket-left_bracket), 1, "\"")            -- sender
+                    if (second_quote == max_length) then return end
                     local first_quote_msg, second_quote_msg = get_char_index(buffer(left_bracket+initial_offset-1, right_bracket-left_bracket), 2, "\"")    -- subject
+                    if (second_quote_msg== max_length) then return end
                     local beg, endd = get_number(buffer(left_bracket+initial_offset, first_quote))                                                          -- message ID
-                    if (beg == -1 and endd == -1) then             -- Jestlize doslo k chybe pri hledani message ID, posunu se rovnou na dalsi zpravu (Nemelo by nastat)
+                    if (beg == -1 and endd == -1) then              -- Jestlize doslo k chybe pri hledani message ID, posunu se rovnou na dalsi zpravu (Nemelo by nastat)
                         i = right_bracket + 2 + initial_offset
                         k = k + 1
                     else                                            -- Jinak muzu do wiresharku pridat nactenou zpravu
@@ -275,14 +316,15 @@ function dissect(max_length, buffer, pinfo, tree)
                 local initial_offset = 1
                 subtree:add(request_opcode):append_text("fetch")
                 local left_bracket, right_bracket = get_char_index(buffer(1, max_length-1), 1, "(")
-                local response_body = buffer(left_bracket+initial_offset, right_bracket-left_bracket-1)
-                local my_string = tostring(response_body)
-                local my_string = Struct.fromhex(my_string)
+                if (right_bracket == max_length) then return end
                 local first_quote, second_quote = get_char_index(buffer(left_bracket+initial_offset, right_bracket-left_bracket-1), 1, "\"")            -- sender
                 subtree:add(sender, buffer(first_quote+left_bracket+initial_offset, second_quote-first_quote-1))
+                if (second_quote == max_length) then return end
                 local first_quote_msg, second_quote_msg = get_char_index(buffer(left_bracket+initial_offset, right_bracket-left_bracket-1), 2, "\"")    -- subject
+                if (second_quote_msg == max_length) then return end
                 local first_quote, second_quote = get_char_index(buffer(left_bracket+initial_offset, right_bracket-left_bracket-1), 3, "\"")            -- body
                 subtree:add(subject, buffer(first_quote_msg+left_bracket+initial_offset, second_quote_msg-first_quote_msg-1))
+                if (second_quote == max_length) then return end
                 subtree:add(body_message, buffer(first_quote+left_bracket+initial_offset, second_quote-first_quote-1))
 
             -- Logout response
@@ -315,11 +357,13 @@ function dissect(max_length, buffer, pinfo, tree)
             command_errors(my_string, max_length, subtree, buffer, "already registered", "register")    -- register
             command_errors(my_string, max_length, subtree, buffer, "message id not found", "fetch")     -- fetch
             command_errors(my_string, max_length, subtree, buffer, "unknown recipient", "send")         -- send
+            command_errors(my_string, max_length, subtree, buffer, "wrong arguments", "fetch")          -- negative number given to fetch
+            command_errors(my_string, max_length, subtree, buffer, "incorrect login", "Uncertain (May be send/list/fetch/logout)")         -- who knows
         end
 
-    -- Nepovedlo se priradit zadny odpovidajici typ, cemuz odpovida jedine, ze zprava byla prilis dlouha a toto je jedna z jejiz casti
+    -- Nepovedlo se priradit zadny odpovidajici typ -- Asi neni z meho protokolu
     elseif msg_type == "unknown" then
-        subtree:add(type):append_text("Rest of message (Original message too long)")
+        subtree:add(type):append_text("Packet might not be from ISA Protocol. Or is perhaps only a part of one big message.")
         subtree:add(body, buffer(0, max_length))
 
     -- Jestli to neni ok, error ani unknown, tak je to jeden z client-side prikazu
@@ -365,8 +409,12 @@ function isa_protocol.dissector(buffer, pinfo, tree)
     if max_length == 0 then                     -- Pokud je delka 0 (Nemelo by nastat), skoncim
         return 
     end
-    
-    dissect(max_length, buffer, pinfo, tree)    -- Jinak volam dissect funkci
+
+    if (max_length > 32731) then                -- Pokud je delka vetsi nez 32731, tak zpracuju i dalsi segment
+        pinfo.cols.protocol = isa_protocol.name     -- Nastaveni kolonky "Protocol" ve wiresharku na ISA
+        pinfo.desegment_len = DESEGMENT_ONE_MORE_SEGMENT
+    end
+    dissect(max_length, buffer, pinfo, tree)
 
 end
 

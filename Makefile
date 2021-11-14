@@ -1,7 +1,7 @@
 CC = g++
 CFLAGS = -Wall -Werror -pedantic
 LFLAGS= -lpcap
-TARGET = my_client
+TARGET = client
 LIBS = base64.o
 OBJ = $(TARGET).o $(LIBS)
 
@@ -18,7 +18,6 @@ $(TARGET): $(OBJ)
 
 clean:
 		rm -f $(OBJ)
-		rm -f xfiala61.tar
 
 pack: all
-	tar -cvf xfiala61.tar Makefile my_client.cpp manual.pdf
+	tar -cvf xfiala61.tar Makefile client.cpp manual.pdf isa.pcap dissector.lua
