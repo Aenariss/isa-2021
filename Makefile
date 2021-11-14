@@ -20,4 +20,4 @@ clean:
 		rm -f $(OBJ)
 
 pack: all
-	tar -cvf xfiala61.tar Makefile client.cpp manual.pdf isa.pcap dissector.lua
+	tar -cvf xfiala61.tar Makefile client.cpp manual.pdf isa.pcap isa.lua

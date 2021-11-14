@@ -23,6 +23,8 @@ request_opcode = ProtoField.string("isa_protocol.body", "Response to Opcode")
 
 isa_protocol.fields = { status, command, response, body, type, msg_length, username, password, user_id, sender, recipient, subject, body_message, message_number, request_opcode }
 
+prev_cmd = "none"
+
 -- Funkce na zjisteni typu zpravy (Response -> Ok/Error; Request -> Command; Nebo taky unknown - pro vse ostatni)
 local function get_status(msg)
     local message_name = "unknown"
@@ -38,6 +40,8 @@ local function get_status(msg)
     elseif string.find(find, "%(send") then message_name = "send"
     elseif string.find(find, "%(list") then message_name = "list"
     end
+
+    if (prev_cmd == "none") then prev_cmd = message_name end
 
     return message_name
 end
@@ -358,7 +362,8 @@ function dissect(max_length, buffer, pinfo, tree)
             command_errors(my_string, max_length, subtree, buffer, "message id not found", "fetch")     -- fetch
             command_errors(my_string, max_length, subtree, buffer, "unknown recipient", "send")         -- send
             command_errors(my_string, max_length, subtree, buffer, "wrong arguments", "fetch")          -- negative number given to fetch
-            command_errors(my_string, max_length, subtree, buffer, "incorrect login", "Uncertain (May be send/list/fetch/logout)")         -- who knows
+            command_errors(my_string, max_length, subtree, buffer, "incorrect login", prev_cmd)         -- who knows, lets find out from the previous packet
+            prev_cmd = "none"
         end
 
     -- Nepovedlo se priradit zadny odpovidajici typ -- Asi neni z meho protokolu
