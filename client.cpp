@@ -261,7 +261,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         found = 0;
 
         if (!strcmp(vec[i].c_str(), "register")) {
-            if (i+2 > limit-1 || i+2 < limit-1) {
+            if (i+2 >= limit || i+2 < limit-1) {
                 std::cerr << "register <username> <password>\n";
                 exit(1);
             }
@@ -274,7 +274,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(vec[i].c_str(), "login")) {
-            if (i+2 > limit-1 || i+2 < limit-1) {
+            if (i+2 >= limit || i+2 < limit-1) {
                 std::cerr << "login <username> <password>\n";
                 exit(1);
             }
@@ -295,7 +295,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
         
         else if (!strcmp(vec[i].c_str(), "send")) {
-            if (i+3 > limit-1) {
+            if (i+3 >= limit || i+3 < limit-1) {
                 std::cerr << "send <recipient> <subject> <body>\n";
                 exit(1);
             }
@@ -309,7 +309,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
         }
 
         else if (!strcmp(vec[i].c_str(), "fetch")) {
-            if (i+1 >= limit) {
+            if (i+1 >= limit || i+1 < limit-1) {
                 std::cerr << "fetch <id>\n";
                 exit(1);
             }
@@ -338,7 +338,7 @@ Parsed_args parse_args(int argc, char *argv[]) {
                 std::cerr << "client: only one instance of one option from (-a --address) is allowed\n";
                 exit(1);
             }
-            if (i+1 > limit-1) {
+            if (i+1 >= limit) {
                 std::cerr << "client: the \"--address\" option needs 1 argument, but 0 provided\n";
                 exit(1);
             }
