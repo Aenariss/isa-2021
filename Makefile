@@ -20,4 +20,4 @@ clean:
 		rm -f $(OBJ)
 
 pack: all
-	tar -cvf xfiala61.tar Makefile client.cpp manual.pdf isa.pcap isa.lua
+	tar -cvf xfiala61.tar Makefile client.cpp manual.pdf isa.pcap isa.lua base64.h base64.cpp
