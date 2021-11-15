@@ -1,4 +1,7 @@
--- https://mika-s.github.io/wireshark/lua/dissector/2018/12/30/creating-port-independent-wireshark-dissectors-in-lua.html
+-- ISA Projekt 2021 -- Reverse-engineering neznameho protokolu
+-- Autor: Vojtech Fiala
+-- Inspirovano: https://mika-s.github.io/wireshark/lua/dissector/2017/11/04/creating-a-wireshark-dissector-in-lua-1.html
+
 -- unfinished capture wireshark error == spatny string.find, neescaptnuty charakter (escape zapomoci %)
 
 -- Tvorba Proto objektu pro protokol
